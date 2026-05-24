@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Synced catalogue items from the ERP (“Push to KC Jewellers”).
+model Product {
+  id                String   @id @default(cuid())
+  barcode           String   @unique
+  styleCode         String?  @map("style_code")
+  sku               String?
+  name              String?
+  netWeight         Decimal? @map("net_weight")
+  grossWeight       Decimal? @map("gross_weight")
+  purity            String?
+  metalType         String?  @map("metal_type")
+  itemCode          String?  @map("item_code")
+  mcRate            Decimal? @map("mc_rate")
+  fixedPrice        Decimal? @map("fixed_price")
+  imageUrl          String?  @map("image_url")
+  secondaryImageUrl String?  @map("secondary_image_url")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("kc_products")
+}

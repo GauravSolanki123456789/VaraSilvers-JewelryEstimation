@@ -1,0 +1,15 @@
+node_modules/
+public/uploads/products/
+jewelry.db
+.env
+.vercel
+*.log
+dist/
+dist-build/
+*.exe
+*.dmg
+*.AppImage
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
