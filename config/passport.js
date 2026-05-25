@@ -80,9 +80,9 @@ passport.use(new GoogleStrategy({
                 console.log(`🔐 Super Admin login detected. Auto-creating account for ${email}`);
                 
                 const newUserResult = await pool.query(
-                    `INSERT INTO users (google_id, email, name, role, account_status, allowed_tabs) 
+                    `INSERT INTO users (google_id, email, name, role, account_status, allowed_tabs)
                      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-                    [googleId, email, displayName || 'Super Admin', 'admin', 'active', ['all']]
+                    [googleId, email, displayName || 'Super Admin', 'super_admin', 'active', ['all']]
                 );
                 
                 console.log(`✅ Super Admin account created: ${email}`);

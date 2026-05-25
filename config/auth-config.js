@@ -3,6 +3,8 @@
  */
 
 const SUPER_ADMIN_EMAIL = (process.env.SUPER_ADMIN_EMAIL || 'jaigaurav56789@gmail.com').toLowerCase().trim();
+const MASTER_ADMIN_USERNAME = (process.env.MASTER_ADMIN_USERNAME || 'Gaurav').trim();
+const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || 'admin123';
 
 function isGoogleOAuthEnabled() {
     const clientId = process.env.GOOGLE_CLIENT_ID && String(process.env.GOOGLE_CLIENT_ID).trim();
@@ -26,6 +28,8 @@ function getSessionCookieOptions() {
 
 module.exports = {
     SUPER_ADMIN_EMAIL,
+    MASTER_ADMIN_USERNAME,
+    DEFAULT_ADMIN_PASSWORD,
     isGoogleOAuthEnabled,
     getSessionCookieOptions
 };

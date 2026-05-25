@@ -670,7 +670,7 @@ const UserManagement = {
                 <!-- Body - Scrollable -->
                 <div class="p-6 overflow-y-auto flex-1">
                     <form id="userPermissionsForm" onsubmit="UserManagement.saveUser(event)">
-                        <input type="hidden" id="editUserId" value="">
+                        <input type="hidden" id="permissionsEditUserId" value="">
                         
                         <!-- Basic Info Section -->
                         <div class="mb-6">
@@ -851,7 +851,7 @@ const UserManagement = {
         this.resetForm();
         
         document.getElementById('userModalTitle').textContent = 'Add New User';
-        document.getElementById('editUserId').value = '';
+        document.getElementById('permissionsEditUserId').value = '';
         document.getElementById('statusSection').classList.add('hidden');
         document.getElementById('permissionStepNumber').textContent = '2';
         document.getElementById('userEmail').removeAttribute('readonly');
@@ -859,9 +859,23 @@ const UserManagement = {
         document.getElementById('passwordSection')?.classList.remove('hidden');
         document.getElementById('userPassword')?.setAttribute('required', 'required');
         document.getElementById('saveUserBtn').textContent = '💾 Add User';
+
+        // Default employee permissions: billing module pre-selected
+        document.getElementById('userRole').value = 'employee';
+        const billingCb = document.querySelector('.module-checkbox[value="billing"]');
+        if (billingCb) billingCb.checked = true;
         
         document.getElementById('userPermissionsModal').classList.remove('hidden');
         document.getElementById('userEmail').focus();
+    },
+
+    openEditModalById(userId) {
+        const user = this.users.find(u => u.id === userId || String(u.id) === String(userId));
+        if (user) {
+            this.openEditModal(user);
+        } else {
+            this.showNotification('User not found. Refresh the list and try again.', 'error');
+        }
     },
 
     async openEditModal(user) {
@@ -874,7 +888,7 @@ const UserManagement = {
         this.resetForm();
         
         document.getElementById('userModalTitle').textContent = 'Edit User';
-        document.getElementById('editUserId').value = user.id;
+        document.getElementById('permissionsEditUserId').value = user.id;
         document.getElementById('statusSection').classList.remove('hidden');
         document.getElementById('permissionStepNumber').textContent = '3';
         document.getElementById('saveUserBtn').textContent = '💾 Update User';
@@ -982,7 +996,7 @@ const UserManagement = {
     async saveUser(event) {
         event.preventDefault();
         
-        const userId = document.getElementById('editUserId').value;
+        const userId = this.editingUserId;
         const email = document.getElementById('userEmail').value.trim();
         const name = document.getElementById('userName').value.trim();
         const role = document.getElementById('userRole').value;
@@ -1130,7 +1144,7 @@ const UserManagement = {
     // ==========================================
 
     renderUserRow(user) {
-        const isSuperAdmin = user.email === 'jaigaurav56789@gmail.com';
+        const isSuperAdmin = user.role === 'super_admin';
         const statusColors = {
             'active': 'bg-green-100 text-green-800',
             'pending': 'bg-yellow-100 text-yellow-800',
@@ -1176,11 +1190,11 @@ const UserManagement = {
                     ${isSuperAdmin ? `
                         <span class="text-xs text-gray-400">Protected</span>
                     ` : `
-                        <button onclick="UserManagement.openEditModal(${JSON.stringify(user).replace(/"/g, '&quot;')})"
+                        <button onclick="UserManagement.openEditModalById(${user.id})"
                             class="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded text-sm font-medium transition">
                             ✏️ Edit
                         </button>
-                        <button onclick="UserManagement.deleteUser(${user.id}, '${user.email}')"
+                        <button onclick="UserManagement.deleteUser(${user.id}, '${String(user.email).replace(/'/g, "\\'")}')"
                             class="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-sm font-medium transition">
                             🗑️
                         </button>

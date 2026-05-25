@@ -69,11 +69,17 @@
             max-height: calc(100vh - 2rem);
             overflow-y: auto;
         }
-        #authModal .brand-name {
+        #forcePasswordChangeModal .login-card {
+            max-height: calc(100vh - 2rem);
+            overflow-y: auto;
+        }
+        #authModal .brand-name,
+        #forcePasswordChangeModal .brand-name {
             line-height: 1.2;
             word-break: break-word;
         }
-        #authModal .auth-input {
+        #authModal .auth-input,
+        #forcePasswordChangeModal .auth-input {
             width: 100%;
             padding: 0.75rem 1rem;
             border: 2px solid #d1d5db;
@@ -81,12 +87,14 @@
             font-size: 1rem;
             transition: border-color 0.15s, box-shadow 0.15s;
         }
-        #authModal .auth-input:focus {
+        #authModal .auth-input:focus,
+        #forcePasswordChangeModal .auth-input:focus {
             outline: none;
             border-color: #d97706;
             box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.2);
         }
-        #authModal .auth-btn-primary {
+        #authModal .auth-btn-primary,
+        #forcePasswordChangeModal .auth-btn-primary {
             width: 100%;
             padding: 0.875rem 1rem;
             background: linear-gradient(to right, #d97706, #ea580c);
@@ -99,11 +107,13 @@
             box-shadow: 0 4px 14px rgba(234, 88, 12, 0.35);
             transition: transform 0.15s, box-shadow 0.15s;
         }
-        #authModal .auth-btn-primary:hover {
+        #authModal .auth-btn-primary:hover,
+        #forcePasswordChangeModal .auth-btn-primary:hover {
             transform: translateY(-1px);
             box-shadow: 0 6px 18px rgba(234, 88, 12, 0.45);
         }
-        #authModal .auth-btn-primary:active {
+        #authModal .auth-btn-primary:active,
+        #forcePasswordChangeModal .auth-btn-primary:active {
             transform: scale(0.98);
         }
         #authModal .auth-divider {
@@ -391,39 +401,21 @@
             </div>
             <form id="passwordLoginForm" class="space-y-4" onsubmit="event.preventDefault(); handleLogin();">
                 <div>
-                    <label for="authUsername" class="block text-sm font-semibold text-gray-700 mb-1.5">Email or username</label>
+                    <label for="authUsername" class="block text-sm font-semibold text-gray-700 mb-1.5">Username or email</label>
                     <input type="text" id="authUsername" name="username" autocomplete="username"
-                        class="auth-input" placeholder="Enter your email or username" required>
+                        class="auth-input" placeholder="Admin username or staff email" required>
                 </div>
                 <div>
                     <label for="authPassword" class="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
                     <input type="password" id="authPassword" name="password" autocomplete="current-password"
                         class="auth-input" placeholder="Enter your password" required>
                 </div>
-                <button type="submit" id="passwordLoginBtn" class="auth-btn-primary">
+                <button type="submit" id="passwordLoginBtn" class="auth-btn-primary w-full">
                     Sign in
                 </button>
             </form>
-            <div id="googleLoginSection" class="hidden space-y-4">
-                <div class="auth-divider">or continue with</div>
-                <a href="/auth/google" id="googleLoginBtn"
-                    class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 font-bold text-base shadow-md transition transform hover:scale-[1.02] active:scale-[0.98]">
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-6 h-6" alt="Google">
-                    <span>Sign in with Google</span>
-                </a>
-            </div>
             <div id="loginError" class="hidden mt-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center"></div>
             <script>
-                // Show Google button only when OAuth is configured on the server
-                fetch('/api/health', { credentials: 'include' })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.googleOAuthEnabled) {
-                            document.getElementById('googleLoginSection').classList.remove('hidden');
-                        }
-                    })
-                    .catch(() => {});
-
                 const urlParams = new URLSearchParams(window.location.search);
                 const error = urlParams.get('error');
                 if (error) {
@@ -433,14 +425,39 @@
                         errorDiv.textContent = 'Authentication failed. Please try again.';
                     } else if (error === 'account_rejected') {
                         errorDiv.textContent = 'Your account has been rejected. Please contact support.';
-                    } else if (error === 'google_not_configured') {
-                        errorDiv.textContent = 'Google sign-in is not configured. Use email and password.';
                     } else {
-                        errorDiv.textContent = 'Login error occurred.';
+                        errorDiv.textContent = 'Login error occurred. Use your username and password.';
                     }
                 }
             </script>
             <div class="mt-6 text-center text-xs text-gray-500" data-brand="copyright">{{COPYRIGHT}}</div>
+        </div>
+    </div>
+
+    <!-- Mandatory first-login password change (master admin) -->
+    <div id="forcePasswordChangeModal" class="fixed inset-0 flex items-center justify-center z-[80] hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
+        <div class="login-card bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8 border-2 border-amber-200">
+            <div class="text-center mb-6">
+                <div class="w-14 h-14 mx-auto mb-3 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-2xl">🔐</div>
+                <h3 class="text-xl font-bold text-gray-800">Set Your Admin Password</h3>
+                <p class="text-sm text-gray-500 mt-2">For security, you must choose a new password before using the app.</p>
+            </div>
+            <form onsubmit="event.preventDefault(); submitForcePasswordChange();" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Current (temporary) password</label>
+                    <input type="password" id="forceCurrentPassword" class="auth-input" required autocomplete="current-password">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">New password</label>
+                    <input type="password" id="forceNewPassword" class="auth-input" required minlength="6" autocomplete="new-password">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Confirm new password</label>
+                    <input type="password" id="forceConfirmPassword" class="auth-input" required minlength="6" autocomplete="new-password">
+                </div>
+                <div id="forcePasswordError" class="hidden p-3 bg-red-100 text-red-700 rounded-lg text-sm"></div>
+                <button type="submit" id="forcePasswordSubmitBtn" class="auth-btn-primary w-full">Save &amp; Continue</button>
+            </form>
         </div>
     </div>
 
@@ -3757,7 +3774,7 @@
         </div>
         
         <form onsubmit="event.preventDefault(); saveUserEdit();">
-            <input type="hidden" id="editUserId">
+            <input type="hidden" id="legacyEditUserId">
             
             <div class="space-y-4">
                 <div>
@@ -3809,7 +3826,7 @@
 <div id="changePasswordModal" class="fixed inset-0 flex items-center justify-center z-[70] hidden bg-black bg-opacity-50 p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8">
         <h3 class="text-xl font-bold text-gray-800 mb-2">🔑 Change Admin Password</h3>
-        <p class="text-sm text-gray-500 mb-6">Updates the master admin login (username: Gaurav)</p>
+        <p class="text-sm text-gray-500 mb-6">Updates the master admin login password</p>
         <form onsubmit="event.preventDefault(); submitChangePassword();" class="space-y-4">
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1">Current password</label>
@@ -5650,7 +5667,7 @@ function updateTabVisibility() {
     // Update mobile user name
     const mobileUserNameEl = document.getElementById('mobileUserName');
     if (mobileUserNameEl) {
-        const isAdmin = currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.isMasterAdmin;
+        const isAdmin = isAppAdmin(currentUser);
         const roleText = isAdmin ? ' (Admin)' : '';
         mobileUserNameEl.textContent = `${currentUser.username}${roleText}`;
     }
@@ -5694,7 +5711,7 @@ function updateTabVisibility() {
     }
     
     // Check if user is admin or super_admin
-    const isAdmin = currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.isMasterAdmin;
+    const isAdmin = isAppAdmin(currentUser);
     
     console.log('Updating tab visibility. User:', currentUser.username, 'Role:', currentUser.role, 'Allowed tabs:', allowedTabs, 'Permissions:', permissions);
     
@@ -5781,16 +5798,15 @@ function updateTabVisibility() {
 }
 
 // Tally Configuration Functions
+// Role helpers — use consistently across the app
+function isAppAdmin(user = currentUser) {
+    if (!user) return false;
+    return user.role === 'admin' || user.role === 'super_admin' || user.isMasterAdmin === true;
+}
+
 async function showTallyConfig() {
-    // Check permissions - only admin or super-admin (Gaurav) can access
-    const canAccessTally = (currentUser.username === 'admin' || 
-                           currentUser.username === 'Gaurav' || 
-                           currentUser.role === 'admin' || 
-                           currentUser.isMasterAdmin === true) &&
-                          currentUser.role !== 'employee';
-    
-    if (!canAccessTally) {
-        showDialog('Access Denied', 'Only administrators can configure Tally integration. Employee role does not have access to this feature.', 'error');
+    if (!isAppAdmin()) {
+        showDialog('Access Denied', 'Only administrators can configure Tally integration.', 'error');
         return;
     }
     
@@ -6148,7 +6164,7 @@ async function loadWhitelistedUsers() {
 
 // Open Edit User Modal
 function openEditUserModal(userId, email, name, role, status) {
-    document.getElementById('editUserId').value = userId;
+    document.getElementById('legacyEditUserId').value = userId;
     document.getElementById('editUserEmail').value = email;
     document.getElementById('editUserName').value = name;
     document.getElementById('editUserRole').value = role || 'employee';
@@ -6168,7 +6184,7 @@ function closeEditUserModal() {
 
 // Save user edit
 async function saveUserEdit() {
-    const userId = document.getElementById('editUserId').value;
+    const userId = document.getElementById('legacyEditUserId').value;
     const name = document.getElementById('editUserName').value.trim();
     const role = document.getElementById('editUserRole').value;
     const accountStatus = document.getElementById('editUserStatus').value;
@@ -6312,7 +6328,7 @@ window.handleLogin = async function() {
     const errorDiv = document.getElementById('loginError');
 
     if (!username || !password) {
-        errorDiv.textContent = 'Please enter email/username and password.';
+        errorDiv.textContent = 'Please enter username/email and password.';
         errorDiv.classList.remove('hidden');
         return;
     }
@@ -6325,39 +6341,18 @@ window.handleLogin = async function() {
         const loginResult = await api.login(username, password);
 
         if (loginResult.success && loginResult.user) {
-            currentUser = loginResult.user;
-            currentUser.permissions = loginResult.permissions || {};
-            currentUser.username = currentUser.name || currentUser.email;
-            currentUser.allowedTabs = currentUser.allowed_tabs || loginResult.allowedTabs || ['all'];
+            applyLoginUser(loginResult);
 
-            if (typeof PermissionContext !== 'undefined' && loginResult.permissionContext) {
-                PermissionContext.init(loginResult.permissionContext);
-            }
-
-            if (currentUser.account_status && currentUser.account_status !== 'active') {
-                if (currentUser.account_status === 'pending') {
-                    window.location.href = '/complete-profile.html';
-                    return;
-                }
-                window.location.href = '/unauth.html?reason=' + currentUser.account_status;
+            if (loginResult.mustChangePassword) {
+                document.getElementById('forceCurrentPassword').value = password;
+                document.getElementById('forceNewPassword').value = '';
+                document.getElementById('forceConfirmPassword').value = '';
+                document.getElementById('forcePasswordError')?.classList.add('hidden');
+                document.getElementById('forcePasswordChangeModal')?.classList.remove('hidden');
                 return;
             }
 
-            setCachedItem('currentUser', currentUser);
-            document.getElementById('authModal').classList.add('hidden');
-            document.getElementById('app').classList.remove('hidden');
-            updateTabVisibility();
-
-            if (typeof initSocketConnection === 'function') {
-                initSocketConnection();
-            }
-            if (typeof NavigationController !== 'undefined') {
-                NavigationController.init();
-            }
-
-            showTab('billing');
-            await loadDataFromAPI();
-            await loadProducts();
+            await enterApplicationAfterLogin();
             return;
         }
 
@@ -6373,6 +6368,97 @@ window.handleLogin = async function() {
         document.getElementById('authPassword').value = '';
     }
 };
+
+function applyLoginUser(loginResult) {
+    currentUser = loginResult.user;
+    currentUser.permissions = loginResult.permissions || {};
+    currentUser.isMasterAdmin = loginResult.isMasterAdmin === true || currentUser.role === 'super_admin' || currentUser.role === 'admin';
+    currentUser.username = currentUser.name || currentUser.email;
+    currentUser.allowedTabs = currentUser.allowed_tabs || loginResult.allowedTabs || ['all'];
+
+    if (typeof PermissionContext !== 'undefined' && loginResult.permissionContext) {
+        PermissionContext.init(loginResult.permissionContext);
+    }
+}
+
+async function enterApplicationAfterLogin() {
+    if (currentUser.account_status && currentUser.account_status !== 'active') {
+        if (currentUser.account_status === 'pending') {
+            window.location.href = '/complete-profile.html';
+            return;
+        }
+        window.location.href = '/unauth.html?reason=' + currentUser.account_status;
+        return;
+    }
+
+    setCachedItem('currentUser', currentUser);
+    document.getElementById('authModal').classList.add('hidden');
+    document.getElementById('forcePasswordChangeModal')?.classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    updateTabVisibility();
+
+    if (typeof initSocketConnection === 'function') {
+        initSocketConnection();
+    }
+    if (typeof NavigationController !== 'undefined') {
+        NavigationController.init();
+    }
+
+    showTab('billing');
+    await loadDataFromAPI();
+    await loadProducts();
+
+    const userNameEl = document.getElementById('currentUserName');
+    if (userNameEl) {
+        userNameEl.textContent = `User: ${currentUser.username}`;
+    }
+}
+
+async function submitForcePasswordChange() {
+    const currentPassword = document.getElementById('forceCurrentPassword').value;
+    const newPassword = document.getElementById('forceNewPassword').value;
+    const confirmPassword = document.getElementById('forceConfirmPassword').value;
+    const errorDiv = document.getElementById('forcePasswordError');
+    const submitBtn = document.getElementById('forcePasswordSubmitBtn');
+
+    if (newPassword !== confirmPassword) {
+        errorDiv.textContent = 'New passwords do not match.';
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+    if (newPassword.length < 6) {
+        errorDiv.textContent = 'Password must be at least 6 characters.';
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving…';
+    errorDiv.classList.add('hidden');
+
+    try {
+        const response = await fetch('/api/admin/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+            showToast('Password updated. Welcome!', 'success');
+            await enterApplicationAfterLogin();
+        } else {
+            errorDiv.textContent = result.error || 'Failed to change password';
+            errorDiv.classList.remove('hidden');
+        }
+    } catch (error) {
+        errorDiv.textContent = 'Could not connect to server.';
+        errorDiv.classList.remove('hidden');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save & Continue';
+    }
+}
 
 async function loadDataFromAPI() {
     try {
@@ -6533,17 +6619,21 @@ document.addEventListener('DOMContentLoaded', async function() {
         const data = await response.json();
         
         if (data.isAuthenticated) {
-            currentUser = data.user;
-            // Store permissions from server (legacy format)
-            currentUser.permissions = data.permissions || {};
+            applyLoginUser({
+                user: data.user,
+                permissions: data.permissions,
+                permissionContext: data.permissionContext,
+                isMasterAdmin: data.isMasterAdmin,
+                allowedTabs: data.user?.allowed_tabs
+            });
+            currentUser.isMasterAdmin = data.isMasterAdmin === true || currentUser.role === 'super_admin' || currentUser.role === 'admin';
             
             // SECURITY: Initialize global permission context (new granular format)
             if (typeof PermissionContext !== 'undefined') {
-                // Build permission context from server data
                 const permCtx = data.permissionContext || {
-                    isAdmin: currentUser.role === 'admin' || currentUser.role === 'super_admin',
-                    isSuperAdmin: currentUser.email === 'jaigaurav56789@gmail.com',
-                    hasFullAccess: currentUser.role === 'admin',
+                    isAdmin: isAppAdmin(currentUser),
+                    isSuperAdmin: currentUser.role === 'super_admin',
+                    hasFullAccess: isAppAdmin(currentUser),
                     modules: data.permissions?.modules || currentUser.allowed_tabs || ['billing'],
                     allowedTabs: currentUser.allowed_tabs || ['billing']
                 };
@@ -6557,6 +6647,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                 try { currentUser.allowedTabs = JSON.parse(currentUser.allowedTabs); } catch(e) { currentUser.allowedTabs = ['all']; }
             }
             if (!Array.isArray(currentUser.allowedTabs)) currentUser.allowedTabs = ['all'];
+
+            if (data.mustChangePassword) {
+                document.getElementById('authModal').classList.add('hidden');
+                document.getElementById('forcePasswordChangeModal')?.classList.remove('hidden');
+                return;
+            }
             
             // SECURITY: Check if user account is active
             if (currentUser.account_status !== 'active') {
@@ -6590,7 +6686,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             // Load protected data only after successful auth
             if (typeof loadInvoiceSettings === 'function') loadInvoiceSettings();
-            if (typeof UserManagement !== 'undefined' && UserManagement.fetchPermissionModules && (currentUser.role === 'admin' || currentUser.role === 'super_admin')) {
+            if (typeof UserManagement !== 'undefined' && UserManagement.fetchPermissionModules && isAppAdmin(currentUser)) {
                 await UserManagement.fetchPermissionModules();
                 if (typeof UserManagement.renderModuleCheckboxes === 'function') UserManagement.renderModuleCheckboxes();
             }

@@ -33,22 +33,27 @@ async function initDatabase(retries = 3, delay = 2000) {
                     username VARCHAR(100) UNIQUE NOT NULL,
                     password_hash VARCHAR(255) NOT NULL,
                     is_super_admin BOOLEAN DEFAULT false,
+                    must_change_password BOOLEAN DEFAULT true,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             `);
-            
+            await pool.query(`
+                ALTER TABLE admin_users
+                ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false
+            `);
+
             const bcrypt = require('bcrypt');
-            
+            const { MASTER_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD } = require('./auth-config');
+
             // Check if default super admin exists
-            const adminCheck = await pool.query('SELECT * FROM admin_users WHERE username = $1', ['Gaurav']);
+            const adminCheck = await pool.query('SELECT * FROM admin_users WHERE username = $1', [MASTER_ADMIN_USERNAME]);
             if (adminCheck.rows.length === 0) {
-                // Create default super admin with temporary password
-                const tempPassword = await bcrypt.hash('CHANGE_ME_' + Date.now(), 10);
+                const tempPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
                 await pool.query(
-                    'INSERT INTO admin_users (username, password_hash, is_super_admin) VALUES ($1, $2, $3)',
-                    ['Gaurav', tempPassword, true]
+                    'INSERT INTO admin_users (username, password_hash, is_super_admin, must_change_password) VALUES ($1, $2, $3, $4)',
+                    [MASTER_ADMIN_USERNAME, tempPassword, true, true]
                 );
-                console.log('⚠️ Default admin user created. Run "npm run change-master-password" to set secure password.');
+                console.log(`⚠️ Default admin created (username: ${MASTER_ADMIN_USERNAME}). Change password on first login.`);
             }
             
             console.log('✅ Database connected');

@@ -374,13 +374,14 @@ async function insertSeedData(pool) {
     // Check and insert admin user
     const adminCheck = await pool.query('SELECT COUNT(*) FROM admin_users');
     if (parseInt(adminCheck.rows[0].count) === 0) {
-        const hashedPassword = await bcrypt.hash('admin123', 10);
+        const { MASTER_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD } = require('../config/auth-config');
+        const hashedPassword = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, 10);
         await pool.query(
-            'INSERT INTO admin_users (username, password_hash, is_super_admin) VALUES ($1, $2, $3)',
-            ['Gaurav', hashedPassword, true]
+            'INSERT INTO admin_users (username, password_hash, is_super_admin, must_change_password) VALUES ($1, $2, $3, $4)',
+            [MASTER_ADMIN_USERNAME, hashedPassword, true, true]
         );
-        console.log('✅ Admin user created (username: Gaurav, password: admin123)');
-        console.log('⚠️  IMPORTANT: Change password immediately with: npm run change-master-password');
+        console.log(`✅ Admin user created (username: ${MASTER_ADMIN_USERNAME}, temporary password: ${DEFAULT_ADMIN_PASSWORD})`);
+        console.log('⚠️  IMPORTANT: Change password on first login or run: npm run change-master-password');
     }
 
     // Check and insert super admin Google user
@@ -389,7 +390,7 @@ async function insertSeedData(pool) {
         await pool.query(
             `INSERT INTO users (email, name, role, account_status, allowed_tabs) 
              VALUES ($1, $2, $3, $4, $5)`,
-            ['jaigaurav56789@gmail.com', 'Gaurav (Super Admin)', 'admin', 'active', ['all']]
+            ['jaigaurav56789@gmail.com', 'Gaurav (Super Admin)', 'super_admin', 'active', ['all']]
         );
         console.log('✅ Super admin user created (jaigaurav56789@gmail.com)');
     }

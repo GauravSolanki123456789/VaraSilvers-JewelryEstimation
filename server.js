@@ -23,7 +23,7 @@ const TallyIntegration = require('./config/tally-integration');
 const TallySyncService = require('./config/tally-sync-service');
 const { getBranding, serveBrandedHtml } = require('./config/branding');
 const { getUploadsDir, getUserDataDir, ensureWritableDir, resolveProductImagePath } = require('./config/paths');
-const { SUPER_ADMIN_EMAIL, isGoogleOAuthEnabled, getSessionCookieOptions } = require('./config/auth-config');
+const { SUPER_ADMIN_EMAIL, MASTER_ADMIN_USERNAME, isGoogleOAuthEnabled, getSessionCookieOptions } = require('./config/auth-config');
 const multer = require('multer');
 const fs = require('fs');
 const ExcelJS = require('exceljs');
@@ -185,7 +185,6 @@ app.get('/auth/google', async (req, res, next) => {
             // 2. If user doesn't exist locally, create a temporary one so you don't crash
             if (!user) {
                 console.log("⚠️ Admin not found locally. Creating one...");
-                // Note: We let PostgreSQL generate the UUID automatically to avoid syntax errors
                 const newUser = await pool.query(`
                     INSERT INTO users (email, name, role, account_status, allowed_tabs, permissions)
                     VALUES ($1, $2, $3, $4, $5, $6)
@@ -199,6 +198,15 @@ app.get('/auth/google', async (req, res, next) => {
                     JSON.stringify({ all: true, modules: ["*"] })
                 ]);
                 user = newUser.rows[0];
+            } else if (user.role !== 'super_admin') {
+                // Upgrade stale dev user to full super_admin access
+                const upgraded = await pool.query(`
+                    UPDATE users
+                    SET role = 'super_admin', account_status = 'active', allowed_tabs = $1, permissions = $2, updated_at = CURRENT_TIMESTAMP
+                    WHERE email = $3
+                    RETURNING *
+                `, [['all'], JSON.stringify({ all: true, modules: ['*'] }), email]);
+                user = upgraded.rows[0];
             }
 
             // 3. Log in with the REAL database user object (has correct UUID)
@@ -257,14 +265,29 @@ app.get('/auth/google/callback',
 );  
 
 // Current user endpoint - include full permissions context
-app.get('/api/auth/current_user', (req, res) => {
+app.get('/api/auth/current_user', async (req, res) => {
     if (req.isAuthenticated()) {
         // Get both legacy and new permission formats
         const legacyPermissions = getUserPermissions(req.user);
         const permissionContext = getPermissionContext(req.user);
+
+        let mustChangePassword = false;
+        if (req.user.role === 'super_admin' || req.user.email === SUPER_ADMIN_EMAIL) {
+            try {
+                const adminRow = await pool.query(
+                    'SELECT must_change_password FROM admin_users WHERE username = $1',
+                    [MASTER_ADMIN_USERNAME]
+                );
+                mustChangePassword = adminRow.rows[0]?.must_change_password === true;
+            } catch (err) {
+                console.warn('Could not check must_change_password:', err.message);
+            }
+        }
         
         res.json({ 
-            isAuthenticated: true, 
+            isAuthenticated: true,
+            mustChangePassword,
+            isMasterAdmin: req.user.role === 'super_admin' || req.user.role === 'admin' || req.user.email === SUPER_ADMIN_EMAIL,
             user: {
                 id: req.user.id,
                 email: req.user.email,
@@ -1026,10 +1049,11 @@ async function checkAndMigrateUsersTable() {
             UPDATE users 
             SET permissions = '{"all": true, "modules": ["*"]}'::jsonb,
                 allowed_tabs = COALESCE(allowed_tabs, ARRAY['all']),
-                role = COALESCE(role, 'admin')
-            WHERE email = 'jaigaurav56789@gmail.com'
-            AND (permissions IS NULL OR permissions = '{}'::jsonb);
-        `);
+                role = 'super_admin',
+                account_status = 'active'
+            WHERE email = $1
+            AND (role IS DISTINCT FROM 'super_admin' OR permissions IS NULL OR permissions = '{}'::jsonb);
+        `, [SUPER_ADMIN_EMAIL]);
         
         console.log('✅ Users table schema verified and migrated');
         return true;
@@ -1037,6 +1061,24 @@ async function checkAndMigrateUsersTable() {
         console.error('❌ Users table migration failed:', error.message);
         console.error('   Full error:', error);
         return false;
+    }
+}
+
+async function ensureSuperAdminRoles() {
+    try {
+        const result = await pool.query(
+            `UPDATE users
+             SET role = 'super_admin', account_status = 'active', allowed_tabs = $1,
+                 permissions = COALESCE(permissions, '{}'::jsonb) || $2::jsonb
+             WHERE email = $3 AND role IS DISTINCT FROM 'super_admin'
+             RETURNING id`,
+            [['all'], JSON.stringify({ all: true, modules: ['*'] }), SUPER_ADMIN_EMAIL]
+        );
+        if (result.rowCount > 0) {
+            console.log(`✅ Upgraded ${result.rowCount} account(s) to super_admin`);
+        }
+    } catch (error) {
+        console.warn('⚠️ Could not ensure super admin roles:', error.message);
     }
 }
 
@@ -1048,6 +1090,7 @@ initDatabase().then(async success => {
         await checkAndUpdateProductsSchema();
         await checkAndCreateStylesTable();
         await checkAndMigrateUsersTable();
+        await ensureSuperAdminRoles();
     } else {
         console.log('⚠️ Server started but database initialization failed.');
         console.log('💡 Please check your PostgreSQL connection and restart the server.');
@@ -1163,7 +1206,10 @@ app.post('/api/auth/login', async (req, res) => {
             if (isValid) {
                 const sessionUser = await resolveAdminSessionUser();
                 await establishPassportSession(req, sessionUser);
-                return res.json(buildLoginPayload(sessionUser));
+                const payload = buildLoginPayload(sessionUser);
+                payload.mustChangePassword = admin.must_change_password === true;
+                payload.masterAdminUsername = admin.username;
+                return res.json(payload);
             }
         }
 
@@ -3057,7 +3103,7 @@ app.post('/api/admin/change-password', checkRole('admin'), async (req, res) => {
         const bcrypt = require('bcrypt');
         
         // Get current admin user
-        const adminUser = await query('SELECT * FROM admin_users WHERE username = $1', ['Gaurav']);
+        const adminUser = await query('SELECT * FROM admin_users WHERE username = $1', [MASTER_ADMIN_USERNAME]);
         
         if (adminUser.length === 0) {
             return res.status(404).json({ error: 'Admin user not found' });
@@ -3069,11 +3115,18 @@ app.post('/api/admin/change-password', checkRole('admin'), async (req, res) => {
             return res.status(401).json({ error: 'Current password is incorrect' });
         }
         
+        if (!newPassword || String(newPassword).length < 6) {
+            return res.status(400).json({ error: 'New password must be at least 6 characters' });
+        }
+        
         // Hash and save new password
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await query('UPDATE admin_users SET password_hash = $1 WHERE username = $2', [hashedPassword, 'Gaurav']);
+        await query(
+            'UPDATE admin_users SET password_hash = $1, must_change_password = false WHERE username = $2',
+            [hashedPassword, MASTER_ADMIN_USERNAME]
+        );
         
-        res.json({ success: true, message: 'Password changed successfully' });
+        res.json({ success: true, message: 'Password changed successfully', mustChangePassword: false });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -3168,6 +3221,8 @@ app.post('/api/admin/add-user', checkRole('admin'), async (req, res) => {
                 return res.status(400).json({ error: 'Password must be at least 6 characters' });
             }
             passwordHash = await bcrypt.hash(String(rawPassword).trim(), 10);
+        } else {
+            return res.status(400).json({ error: 'Password is required for new users' });
         }
 
         // Insert new user with permissions
@@ -3205,9 +3260,9 @@ app.put('/api/admin/users/:id', checkRole('admin'), async (req, res) => {
         const user = existingUser[0];
         
         // Prevent modifying super admin's role or permissions
-        if (user.email === 'jaigaurav56789@gmail.com') {
+        if (user.role === 'super_admin' || user.email === SUPER_ADMIN_EMAIL) {
             // Only allow name update for super admin
-            if (role && role !== 'admin') {
+            if (role && role !== 'super_admin' && role !== 'admin') {
                 return res.status(403).json({ error: 'Cannot change Super Admin role' });
             }
             if (allowed_tabs && !allowed_tabs.includes('all')) {

@@ -48,7 +48,7 @@ function userHasPermission(user, requiredModule) {
     if (!user) return false;
     
     // Super Admin always has access
-    if (user.email === 'jaigaurav56789@gmail.com') {
+    if (user.role === 'super_admin') {
         return true;
     }
     
@@ -234,7 +234,7 @@ const getPermissionContext = (user) => {
     }
     
     const isAdmin = user.role === 'admin' || user.role === 'super_admin';
-    const isSuperAdmin = user.email === 'jaigaurav56789@gmail.com';
+    const isSuperAdmin = user.role === 'super_admin';
     const allowedTabs = user.allowed_tabs || [];
     const permissions = user.permissions || {};
     const hasFullAccess = isAdmin || isSuperAdmin || allowedTabs.includes('all') || permissions.all === true;
