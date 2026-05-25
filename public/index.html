@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jewellery Software</title>
+    <title>{{COMPANY_NAME}}</title>
+    {{BRANDING_SCRIPT}}
+    <script src="/js/branding.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -60,6 +62,77 @@
         /* Show mobile settings button */
         .mobile-settings-btn {
             display: flex !important;
+        }
+        
+        /* Login screen — mobile-first branding */
+        #authModal .login-card {
+            max-height: calc(100vh - 2rem);
+            overflow-y: auto;
+        }
+        #authModal .brand-name {
+            line-height: 1.2;
+            word-break: break-word;
+        }
+        #authModal .auth-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid #d1d5db;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        #authModal .auth-input:focus {
+            outline: none;
+            border-color: #d97706;
+            box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.2);
+        }
+        #authModal .auth-btn-primary {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            background: linear-gradient(to right, #d97706, #ea580c);
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+            border: none;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(234, 88, 12, 0.35);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        #authModal .auth-btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(234, 88, 12, 0.45);
+        }
+        #authModal .auth-btn-primary:active {
+            transform: scale(0.98);
+        }
+        #authModal .auth-divider {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: #9ca3af;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        #authModal .auth-divider::before,
+        #authModal .auth-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #e5e7eb;
+        }
+        @media (max-width: 640px) {
+            #authModal .login-card {
+                padding: 1.25rem;
+                border-radius: 1rem;
+            }
+            #authModal .brand-name {
+                font-size: 1.5rem;
+            }
+            #authModal .auth-input {
+                font-size: 16px; /* prevents iOS zoom on focus */
+            }
         }
         
         /* Make header title smaller on mobile */
@@ -308,23 +381,49 @@
     </script>
     
     <!-- Authentication Modal -->
-    <div id="authModal" class="fixed inset-0 flex items-center justify-center z-50 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-        <div class="bg-white p-10 rounded-lg shadow-2xl max-w-md w-full mx-4 border-2 border-gray-200">
+    <div id="authModal" class="fixed inset-0 flex items-center justify-center z-50 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
+        <div class="login-card bg-white p-6 sm:p-10 rounded-2xl shadow-2xl max-w-md w-full border-2 border-gray-200">
             <div class="text-center mb-8">
-                <div class="text-4xl font-bold text-gray-800 mb-2">Gaurav Softwares</div>
-                <div class="text-xl text-gray-600 mb-6">Jewellery Estimations</div>
+                <div id="brandInitials" class="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shadow-lg" aria-hidden="true"></div>
+                <div class="brand-name text-2xl sm:text-4xl font-bold text-gray-800 mb-2" data-brand="companyName">{{COMPANY_NAME}}</div>
+                <div class="text-base sm:text-xl text-gray-500 mb-6" data-brand="appTagline">{{APP_TAGLINE}}</div>
                 <div class="h-1 w-24 bg-amber-600 mx-auto"></div>
             </div>
-            <div class="space-y-5">
-                <a href="/auth/google" class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-bold text-lg shadow-lg transition transform hover:scale-105">
+            <form id="passwordLoginForm" class="space-y-4" onsubmit="event.preventDefault(); handleLogin();">
+                <div>
+                    <label for="authUsername" class="block text-sm font-semibold text-gray-700 mb-1.5">Email or username</label>
+                    <input type="text" id="authUsername" name="username" autocomplete="username"
+                        class="auth-input" placeholder="Enter your email or username" required>
+                </div>
+                <div>
+                    <label for="authPassword" class="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
+                    <input type="password" id="authPassword" name="password" autocomplete="current-password"
+                        class="auth-input" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" id="passwordLoginBtn" class="auth-btn-primary">
+                    Sign in
+                </button>
+            </form>
+            <div id="googleLoginSection" class="hidden space-y-4">
+                <div class="auth-divider">or continue with</div>
+                <a href="/auth/google" id="googleLoginBtn"
+                    class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 font-bold text-base shadow-md transition transform hover:scale-[1.02] active:scale-[0.98]">
                     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-6 h-6" alt="Google">
                     <span>Sign in with Google</span>
                 </a>
-                <!-- Login helper text removed for cleaner UI -->
             </div>
             <div id="loginError" class="hidden mt-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center"></div>
             <script>
-                // Check for URL parameters for errors
+                // Show Google button only when OAuth is configured on the server
+                fetch('/api/health', { credentials: 'include' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.googleOAuthEnabled) {
+                            document.getElementById('googleLoginSection').classList.remove('hidden');
+                        }
+                    })
+                    .catch(() => {});
+
                 const urlParams = new URLSearchParams(window.location.search);
                 const error = urlParams.get('error');
                 if (error) {
@@ -334,14 +433,14 @@
                         errorDiv.textContent = 'Authentication failed. Please try again.';
                     } else if (error === 'account_rejected') {
                         errorDiv.textContent = 'Your account has been rejected. Please contact support.';
+                    } else if (error === 'google_not_configured') {
+                        errorDiv.textContent = 'Google sign-in is not configured. Use email and password.';
                     } else {
                         errorDiv.textContent = 'Login error occurred.';
                     }
                 }
             </script>
-            <div class="mt-6 text-center text-xs text-gray-500">
-                © 2025 Gaurav Softwares. All rights reserved.
-            </div>
+            <div class="mt-6 text-center text-xs text-gray-500" data-brand="copyright">{{COPYRIGHT}}</div>
         </div>
     </div>
 
@@ -362,7 +461,7 @@
                             </svg>
                         </button>
                         <div>
-                            <h1 class="header-title text-xl md:text-3xl font-bold mb-1">Jewellery Estimations</h1>
+                            <h1 class="header-title text-xl md:text-3xl font-bold mb-1" data-brand="companyName">{{COMPANY_NAME}}</h1>
                             <div class="flex items-center gap-2">
                                 <span class="header-subtitle text-amber-100 text-xs md:text-base">Quotation No:</span>
                                 <input 
@@ -382,6 +481,9 @@
                         <!-- Desktop Admin Buttons (hidden on mobile) -->
                         <div class="admin-buttons-desktop hidden md:flex items-center gap-2 text-sm" id="userInfoSection">
                             <span class="text-amber-100" id="currentUserName">User: Guest</span>
+                            <button onclick="showChangePasswordModal()" id="btnChangePassword" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-medium transition hidden admin-only">
+                                🔑 Change Password
+                            </button>
                             <button onclick="logout()" class="px-3 py-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded-lg text-xs font-medium transition">
                                 Logout
                             </button>
@@ -3577,7 +3679,7 @@
             <!-- Info Banner - Clean version for end users -->
             <div class="bg-blue-50 border-l-4 border-blue-500 p-3 mb-4 rounded-r-lg">
                 <p class="text-sm text-blue-700">
-                    <strong>🔐 Add authorized users below.</strong> Users will receive login access via their Google account.
+                    <strong>🔐 Add staff users below.</strong> Each user gets email + password login (no Google required).
                 </p>
             </div>
             
@@ -3698,6 +3800,33 @@
                     class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
                     Cancel
                 </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Change Admin Password Modal -->
+<div id="changePasswordModal" class="fixed inset-0 flex items-center justify-center z-[70] hidden bg-black bg-opacity-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8">
+        <h3 class="text-xl font-bold text-gray-800 mb-2">🔑 Change Admin Password</h3>
+        <p class="text-sm text-gray-500 mb-6">Updates the master admin login (username: Gaurav)</p>
+        <form onsubmit="event.preventDefault(); submitChangePassword();" class="space-y-4">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Current password</label>
+                <input type="password" id="currentAdminPassword" class="auth-input" required autocomplete="current-password">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">New password</label>
+                <input type="password" id="newAdminPassword" class="auth-input" required minlength="6" autocomplete="new-password">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Confirm new password</label>
+                <input type="password" id="confirmAdminPassword" class="auth-input" required minlength="6" autocomplete="new-password">
+            </div>
+            <div id="changePasswordError" class="hidden p-3 bg-red-100 text-red-700 rounded-lg text-sm"></div>
+            <div class="flex gap-3 pt-2">
+                <button type="submit" class="flex-1 auth-btn-primary">Update Password</button>
+                <button type="button" onclick="closeChangePasswordModal()" class="px-4 py-3 bg-gray-200 rounded-lg font-medium">Cancel</button>
             </div>
         </form>
     </div>
@@ -4181,14 +4310,9 @@
 </div>
 
     <script>
-        // Cloud setup: API and Socket.IO URLs
-        const isCloud = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-        window.API_BASE_URL = isCloud 
-            ? `${window.location.protocol}//${window.location.host}/api`
-            : 'http://localhost:3000/api';
-        window.SOCKET_URL = isCloud 
-            ? `${window.location.protocol}//${window.location.host}`
-            : 'http://localhost:3000';
+        // API and Socket.IO URLs — always use the current page origin
+        window.API_BASE_URL = '/api';
+        window.SOCKET_URL = window.location.origin;
         
         // Real-time sync for cloud setup (Socket.IO)
         let socket = null;
@@ -4499,7 +4623,7 @@
         }
         
         // Use global API_BASE_URL set above
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         
         // API Helper Functions (Single-Tenant Version)
         const api = {
@@ -4515,6 +4639,7 @@
                 const url = `${API_BASE}${endpoint}`;
                 
                 const defaultOptions = {
+                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
                     },
@@ -4864,12 +4989,16 @@
             
             async login(username, password) {
                 try {
-                    const response = await fetch(`${API_BASE.replace('/api', '')}/api/auth/login`, {
+                    const response = await fetch('/api/auth/login', {
                         method: 'POST',
+                        credentials: 'include',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ username, password }),
                     });
                     const data = await response.json();
+                    if (!response.ok) {
+                        return { success: false, error: data.error || 'Login failed' };
+                    }
                     return data;
                 } catch (error) {
                     console.error('Login error:', error);
@@ -4879,7 +5008,7 @@
             
             // Update software API
             async updateSoftware() {
-                const response = await fetch(`${API_BASE.replace('/api', '')}/api/update-software`, {
+                const response = await fetch('/api/update-software', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                 });
@@ -5521,7 +5650,7 @@ function updateTabVisibility() {
     // Update mobile user name
     const mobileUserNameEl = document.getElementById('mobileUserName');
     if (mobileUserNameEl) {
-        const isAdmin = currentUser.role === 'admin' || currentUser.role === 'super_admin';
+        const isAdmin = currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.isMasterAdmin;
         const roleText = isAdmin ? ' (Admin)' : '';
         mobileUserNameEl.textContent = `${currentUser.username}${roleText}`;
     }
@@ -5565,7 +5694,7 @@ function updateTabVisibility() {
     }
     
     // Check if user is admin or super_admin
-    const isAdmin = currentUser.role === 'admin' || currentUser.role === 'super_admin';
+    const isAdmin = currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.isMasterAdmin;
     
     console.log('Updating tab visibility. User:', currentUser.username, 'Role:', currentUser.role, 'Allowed tabs:', allowedTabs, 'Permissions:', permissions);
     
@@ -5639,6 +5768,10 @@ function updateTabVisibility() {
     }
     if (btnTallyConfig) {
         btnTallyConfig.classList.toggle('hidden', !isAdmin);
+    }
+    const btnChangePassword = document.getElementById('btnChangePassword');
+    if (btnChangePassword) {
+        btnChangePassword.classList.toggle('hidden', !isAdmin);
     }
     
     // Update mobile settings dropdown
@@ -5816,7 +5949,7 @@ function updateTallyStatus(message, type) {
 async function showUserManagement() {
     // SECURITY: Only admin can manage users
     const permissions = currentUser?.permissions || {};
-    const isAdmin = permissions.isAdmin || currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
+    const isAdmin = permissions.isAdmin || currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || currentUser?.isMasterAdmin;
     
     if (!isAdmin) {
         showDialog('Access Denied', 'Only administrators can manage users.', 'error');
@@ -5834,6 +5967,56 @@ async function showUserManagement() {
 
 function closeUserManagementModal() {
     document.getElementById('userManagementModal')?.classList.add('hidden');
+}
+
+function showChangePasswordModal() {
+    document.getElementById('changePasswordError')?.classList.add('hidden');
+    document.getElementById('currentAdminPassword').value = '';
+    document.getElementById('newAdminPassword').value = '';
+    document.getElementById('confirmAdminPassword').value = '';
+    document.getElementById('changePasswordModal')?.classList.remove('hidden');
+}
+
+function closeChangePasswordModal() {
+    document.getElementById('changePasswordModal')?.classList.add('hidden');
+}
+
+async function submitChangePassword() {
+    const currentPassword = document.getElementById('currentAdminPassword').value;
+    const newPassword = document.getElementById('newAdminPassword').value;
+    const confirmPassword = document.getElementById('confirmAdminPassword').value;
+    const errorDiv = document.getElementById('changePasswordError');
+
+    if (newPassword !== confirmPassword) {
+        errorDiv.textContent = 'New passwords do not match.';
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+    if (newPassword.length < 6) {
+        errorDiv.textContent = 'Password must be at least 6 characters.';
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/admin/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+            closeChangePasswordModal();
+            showDialog('Success', 'Admin password updated successfully.', 'success');
+        } else {
+            errorDiv.textContent = result.error || 'Failed to change password';
+            errorDiv.classList.remove('hidden');
+        }
+    } catch (error) {
+        errorDiv.textContent = 'Could not connect to server.';
+        errorDiv.classList.remove('hidden');
+    }
 }
 
 // Add user (Admin only)
@@ -5865,6 +6048,7 @@ async function addUserToWhitelist() {
         const response = await fetch('/api/users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ email, name, role })
         });
         
@@ -5896,7 +6080,7 @@ async function loadWhitelistedUsers() {
     userListDiv.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">Loading users...</td></tr>';
     
     try {
-        const response = await fetch('/api/users');
+        const response = await fetch('/api/admin/users', { credentials: 'include' });
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
@@ -6080,7 +6264,7 @@ window.renderUserManagement = async function() {
 window.editUser = async function(usernameOrEmail) {
     // Find user by email or username
     try {
-        const response = await fetch('/api/users');
+        const response = await fetch('/api/admin/users', { credentials: 'include' });
         const users = await response.json();
         const user = users.find(u => u.email === usernameOrEmail || u.name === usernameOrEmail);
         
@@ -6098,7 +6282,7 @@ window.editUser = async function(usernameOrEmail) {
 window.deleteUser = async function(usernameOrEmail) {
     // Find user by email or username
     try {
-        const response = await fetch('/api/users');
+        const response = await fetch('/api/admin/users', { credentials: 'include' });
         const users = await response.json();
         const user = users.find(u => u.email === usernameOrEmail || u.name === usernameOrEmail);
         
@@ -6124,68 +6308,70 @@ window.addNewUser = function() {
 window.handleLogin = async function() {
     const username = document.getElementById('authUsername').value.trim();
     const password = document.getElementById('authPassword').value;
+    const loginBtn = document.getElementById('passwordLoginBtn');
+    const errorDiv = document.getElementById('loginError');
 
     if (!username || !password) {
-        showDialog('Login Failed', 'Please enter username and password!', 'error');
+        errorDiv.textContent = 'Please enter email/username and password.';
+        errorDiv.classList.remove('hidden');
         return;
     }
 
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Signing in…';
+    errorDiv.classList.add('hidden');
+
     try {
-        // Single-tenant login (no tenant code required)
         const loginResult = await api.login(username, password);
-        
-        if (loginResult.success) {
-            // Handle both camelCase and snake_case from server
-            let allowedTabs = loginResult.allowedTabs || loginResult.allowed_tabs || [];
-            
-            // Ensure allowedTabs is an array
-            if (typeof allowedTabs === 'string') {
-                try {
-                    allowedTabs = JSON.parse(allowedTabs);
-                } catch (e) {
-                    allowedTabs = allowedTabs.split(',').map(t => t.trim()).filter(t => t);
+
+        if (loginResult.success && loginResult.user) {
+            currentUser = loginResult.user;
+            currentUser.permissions = loginResult.permissions || {};
+            currentUser.username = currentUser.name || currentUser.email;
+            currentUser.allowedTabs = currentUser.allowed_tabs || loginResult.allowedTabs || ['all'];
+
+            if (typeof PermissionContext !== 'undefined' && loginResult.permissionContext) {
+                PermissionContext.init(loginResult.permissionContext);
+            }
+
+            if (currentUser.account_status && currentUser.account_status !== 'active') {
+                if (currentUser.account_status === 'pending') {
+                    window.location.href = '/complete-profile.html';
+                    return;
                 }
+                window.location.href = '/unauth.html?reason=' + currentUser.account_status;
+                return;
             }
-            if (!Array.isArray(allowedTabs)) {
-                allowedTabs = [];
-            }
-            
-            currentUser = {
-                username: loginResult.username,
-                role: loginResult.role || 'user',
-                allowedTabs: allowedTabs,
-                isMasterAdmin: loginResult.isMasterAdmin || false
-            };
-            
-            console.log('User logged in:', currentUser.username, 'Role:', currentUser.role);
-            
+
             setCachedItem('currentUser', currentUser);
             document.getElementById('authModal').classList.add('hidden');
             document.getElementById('app').classList.remove('hidden');
             updateTabVisibility();
-            
-            // Initialize real-time sync
+
             if (typeof initSocketConnection === 'function') {
                 initSocketConnection();
             }
-            
-            // Show billing tab by default
+            if (typeof NavigationController !== 'undefined') {
+                NavigationController.init();
+            }
+
             showTab('billing');
-            
-            // Load data from API
             await loadDataFromAPI();
             await loadProducts();
             return;
-        } else {
-            showDialog('Login Failed', loginResult.error || 'Invalid credentials.', 'error');
         }
-    } catch (apiError) {
-        console.log('API login failed:', apiError);
-        showDialog('Login Failed', 'Invalid credentials. Please check your username and password.', 'error');
-        return;
-    }
 
-    document.getElementById('authPassword').value = '';
+        errorDiv.textContent = loginResult.error || 'Invalid credentials.';
+        errorDiv.classList.remove('hidden');
+    } catch (apiError) {
+        console.error('API login failed:', apiError);
+        errorDiv.textContent = 'Could not connect to the server. Check that the app is running.';
+        errorDiv.classList.remove('hidden');
+    } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Sign in';
+        document.getElementById('authPassword').value = '';
+    }
 };
 
 async function loadDataFromAPI() {
@@ -6343,7 +6529,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Check server session for authentication
     try {
-        const response = await fetch('/api/auth/current_user');
+        const response = await fetch('/api/auth/current_user', { credentials: 'include' });
         const data = await response.json();
         
         if (data.isAuthenticated) {
@@ -6843,7 +7029,7 @@ billItems = selectedQuotationForBill.items.map(item => {
                         if (!barcodes || barcodes.length === 0) return;
                         
                         try {
-                            const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+                            const API_BASE = window.API_BASE_URL || '/api';
                             await fetch(`${API_BASE}/products/mark-sold`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -7098,7 +7284,7 @@ async function generateSalesBillPDF() {
     doc.text('TAX INVOICE', 105, 15, { align: 'center' });
     
     doc.setFontSize(10);
-    doc.text((inv.companyName || 'COMPANY NAME').toUpperCase(), 105, 20, { align: 'center' });
+    doc.text((inv.companyName || getBrandName()).toUpperCase(), 105, 20, { align: 'center' });
     
     doc.setFontSize(7);
     doc.setFont(undefined, 'normal');
@@ -7278,7 +7464,7 @@ async function generateSalesBillPDF() {
     doc.text('IFSC CODE : ' + (inv.ifscCode || ''), 15, footerY + 12);
     doc.text('CUSTOMER SIGNATURE', 15, footerY + 20);
     doc.setFont(undefined, 'bold');
-    doc.text('For ' + (inv.companyName || 'COMPANY').toUpperCase(), 150, footerY + 12);
+    doc.text('For ' + (inv.companyName || getBrandName()).toUpperCase(), 150, footerY + 12);
 
     // Save PDF to blob for printing and WhatsApp
     const pdfBlob = doc.output('blob');
@@ -7802,7 +7988,7 @@ async function generateSalesBillPDF() {
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(10);
         doc.setFont(undefined, 'bold');
-        doc.text((inv.companyName || 'COMPANY').toUpperCase(), 105, 15, { align: 'center' });
+        doc.text((inv.companyName || getBrandName()).toUpperCase(), 105, 15, { align: 'center' });
         doc.setFontSize(7);
         doc.setFont(undefined, 'normal');
         (inv.companyAddress || '').split(',').slice(0, 3).forEach((line, i) => doc.text(line.trim(), 105, 20 + i * 4, { align: 'center' }));
@@ -7896,7 +8082,7 @@ async function generateSalesBillPDF() {
         doc.text('AC NO: ' + (inv.accountNo || ''), 15, footerY + 8);
         doc.text('IFSC CODE: ' + (inv.ifscCode || ''), 15, footerY + 12);
         doc.setFont(undefined, 'bold');
-        doc.text('For ' + (inv.companyName || 'COMPANY').toUpperCase(), 150, footerY + 10);
+        doc.text('For ' + (inv.companyName || getBrandName()).toUpperCase(), 150, footerY + 10);
 
         // Save PDF to blob
         const pdfBlob = doc.output('blob');
@@ -9603,7 +9789,7 @@ async function generateSalesBillPDF() {
             itemSelect.innerHTML = '<option value="">-- Loading Items... --</option>';
             itemSelect.disabled = true;
             try {
-                const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+                const API_BASE = window.API_BASE_URL || '/api';
                 const res = await fetch(`${API_BASE}/items/${encodeURIComponent(styleCode)}/${encodeURIComponent(skuCode)}`);
                 if (res.ok) {
                     const items = await res.json();
@@ -9732,7 +9918,7 @@ async function handleProductImageUpload(event) {
     }
     formData.append('image', file);
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         const token = (typeof currentUser !== 'undefined' && currentUser?.token) ? currentUser.token : (localStorage.getItem('token') || '');
         const headers = {};
         if (token) headers['Authorization'] = 'Bearer ' + token;
@@ -9788,7 +9974,7 @@ async function handleSecondaryProductImageUpload(event) {
     formData.append('imageRole', 'secondary');
     formData.append('image', file);
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         const token = (typeof currentUser !== 'undefined' && currentUser?.token) ? currentUser.token : (localStorage.getItem('token') || '');
         const headers = {};
         if (token) headers['Authorization'] = 'Bearer ' + token;
@@ -10351,7 +10537,7 @@ async function deleteProductRecord(idx) {
                 formData.append('images', fileInput.files[i]);
             }
             try {
-                const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+                const API_BASE = window.API_BASE_URL || '/api';
                 const response = await fetch(`${API_BASE}/upload/bulk-barcode-images`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
@@ -10390,7 +10576,7 @@ async function deleteProductRecord(idx) {
                 formData.append('images', fileInput.files[i]);
             }
             try {
-                const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+                const API_BASE = window.API_BASE_URL || '/api';
                 const response = await fetch(`${API_BASE}/upload/bulk-barcode-secondary-images`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
@@ -10446,7 +10632,7 @@ async function deleteProductRecord(idx) {
                 return;
             }
 
-            const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+            const API_BASE = window.API_BASE_URL || '/api';
             const updateButton = document.querySelector('#bulkUpdateModal button[onclick="saveBulkUpdate()"]');
             const originalText = updateButton ? updateButton.textContent : 'Update';
             if (updateButton) {
@@ -10623,7 +10809,7 @@ async function deleteProductRecord(idx) {
                 }));
                 
                 // Use bulk insert endpoint for fast upload
-                const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+                const API_BASE = window.API_BASE_URL || '/api';
                 const response = await fetch(`${API_BASE}/products/bulk`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -14256,17 +14442,17 @@ function clearAll() {
                                     const customer = bill.customer;
                                     
                                     // Generate PDF (same as reprintBillById)
+                                    const inv = invoiceSettings || {};
+                                    const brandName = (inv.companyName || getBrandName()).toUpperCase();
                                     doc.setFontSize(10);
                                     doc.setFont(undefined, 'bold');
-                                    doc.text('JP JEWELLERY', 105, 15, { align: 'center' });
+                                    doc.text(brandName, 105, 15, { align: 'center' });
                                     doc.setFontSize(8);
                                     doc.setFont(undefined, 'normal');
-                                    doc.text('2ND FLOOR, OLD NO.34, NEW NO.21, BOTHRA EMPORIUM', 105, 20, { align: 'center' });
-                                    doc.text('VEERAPPAN STREET, SOWCARPET', 105, 24, { align: 'center' });
-                                    doc.text('CHENNAI 600079 | 044-43593474', 105, 28, { align: 'center' });
-                                    doc.setFont(undefined, 'bold');
-                                    doc.text('TAX INVOICE', 105, 35, { align: 'center' });
-                                    doc.text('33AADFJ4897R1ZJ', 105, 39, { align: 'center' });
+                                    const addrLines = (inv.companyAddress || '').split(',').map(s => s.trim()).filter(Boolean);
+                                    let yHdr = 20;
+                                    addrLines.slice(0, 3).forEach(line => { doc.text(line, 105, yHdr, { align: 'center' }); yHdr += 4; });
+                                    if (inv.gstin) { doc.setFont(undefined, 'bold'); doc.text(inv.gstin, 105, yHdr + 2, { align: 'center' }); }
                                     
                                     doc.setFontSize(8);
                                     doc.text('INVOICE No.:', 15, 48);
@@ -14357,12 +14543,12 @@ function clearAll() {
                                     const footerY = finalY + 25;
                                     doc.setFontSize(7);
                                     doc.setFont(undefined, 'normal');
-                                    doc.text('BANK NAME: HDFC BANK', 15, footerY);
-                                    doc.text('AC NAME: JPJEWELLERY', 15, footerY + 4);
-                                    doc.text('AC NO: 50200016402896', 15, footerY + 8);
-                                    doc.text('IFSC CODE: HDFC0000214', 15, footerY + 12);
+                                    if (inv.bankName) doc.text('BANK NAME: ' + inv.bankName, 15, footerY);
+                                    if (inv.accountName) doc.text('AC NAME: ' + inv.accountName, 15, footerY + 4);
+                                    if (inv.accountNo) doc.text('AC NO: ' + inv.accountNo, 15, footerY + 8);
+                                    if (inv.ifscCode) doc.text('IFSC CODE: ' + inv.ifscCode, 15, footerY + 12);
                                     doc.setFont(undefined, 'bold');
-                                    doc.text('For JP JEWELLERY', 150, footerY + 10);
+                                    doc.text('For ' + brandName, 150, footerY + 10);
                                     
                                     const pdfBlob = doc.output('blob');
                                     const pdfUrl = URL.createObjectURL(pdfBlob);
@@ -14389,11 +14575,11 @@ function clearAll() {
                                     const formattedDate = date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
                                     const customer = bill.customer;
                                     
-                                    // ... (same PDF generation code as above)
+                                    const inv = invoiceSettings || {};
+                                    const brandName = (inv.companyName || getBrandName()).toUpperCase();
                                     doc.setFontSize(10);
                                     doc.setFont(undefined, 'bold');
-                                    doc.text('JP JEWELLERY', 105, 15, { align: 'center' });
-                                    // ... (rest of PDF generation)
+                                    doc.text(brandName, 105, 15, { align: 'center' });
                                     
                                     const pdfBlob = doc.output('blob');
                                     const pdfUrl = URL.createObjectURL(pdfBlob);
@@ -14846,7 +15032,7 @@ function clearAll() {
     doc.setFont(undefined, 'bold');
     doc.text('TAX INVOICE', 105, 15, { align: 'center' });
     doc.setFontSize(10);
-    doc.text((inv.companyName || 'COMPANY').toUpperCase(), 105, 20, { align: 'center' });
+    doc.text((inv.companyName || getBrandName()).toUpperCase(), 105, 20, { align: 'center' });
     doc.setFontSize(7);
     doc.setFont(undefined, 'normal');
     (inv.companyAddress || '').split(',').slice(0, 2).forEach((line, i) => doc.text(line.trim(), 105, 25 + i * 4, { align: 'center' }));
@@ -15006,7 +15192,7 @@ function clearAll() {
     doc.text('IFSC CODE : ' + (inv.ifscCode || ''), 15, footerY + 12);
     doc.text('CUSTOMER SIGNATURE', 15, footerY + 20);
     doc.setFont(undefined, 'bold');
-    doc.text('For ' + (inv.companyName || 'COMPANY').toUpperCase(), 150, footerY + 12);
+    doc.text('For ' + (inv.companyName || getBrandName()).toUpperCase(), 150, footerY + 12);
 
     doc.save(`Bill_${bill.billNo}_REPRINT_${formattedDate.replace(/\//g, '-')}.pdf`);
     showDialog('Reprinted', 'Bill reprinted successfully!', 'success');
@@ -17602,7 +17788,7 @@ function closePaymentModal() {
 
         // Strict hierarchy validation: styleCode and sku must exist in DB
         try {
-            const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+            const API_BASE = window.API_BASE_URL || '/api';
             const stylesRes = await fetch(`${API_BASE}/styles/all`);
             if (stylesRes.ok) {
                 const allStyles = await stylesRes.json();
@@ -17916,7 +18102,7 @@ let selectedItemCode = null; // Currently selected Item
 // Load all styles and group by style_code
 async function loadStyles() {
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         const response = await fetch(`${API_BASE}/styles/all`);
         if (!response.ok) throw new Error('Failed to load styles');
         
@@ -18045,7 +18231,7 @@ async function selectStyle(styleCode) {
 
 async function loadSKUsForStyleMaster(styleCode) {
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         const response = await fetch(`${API_BASE}/styles/${encodeURIComponent(styleCode)}/skus`);
         if (!response.ok) throw new Error('Failed to load SKUs');
         
@@ -18121,7 +18307,7 @@ async function selectSKU(styleCode, skuCode) {
 
 async function loadItemsForSKU(styleCode, skuCode) {
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         const response = await fetch(`${API_BASE}/items/${encodeURIComponent(styleCode)}/${encodeURIComponent(skuCode)}`);
         if (!response.ok) {
             // If 404, no items exist yet - that's okay
@@ -18194,7 +18380,7 @@ async function selectItem(styleCode, skuCode, itemCode) {
     
     // Load item details and show attributes manager
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         const response = await fetch(`${API_BASE}/items/${encodeURIComponent(styleCode)}/${encodeURIComponent(skuCode)}/${encodeURIComponent(itemCode)}`);
         if (response.ok) {
             const item = await response.json();
@@ -18259,7 +18445,7 @@ async function saveItemAttributes() {
     });
     
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         const response = await fetch(`${API_BASE}/items/${encodeURIComponent(selectedStyleCode)}/${encodeURIComponent(selectedSkuCode)}/${encodeURIComponent(selectedItemCode)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -18313,7 +18499,7 @@ async function saveStyle(event) {
     };
     
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         const response = await fetch(`${API_BASE}/styles`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -18417,7 +18603,7 @@ async function saveSku(event) {
     };
     
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         let response;
         
         if (isEditMode) {
@@ -18468,7 +18654,7 @@ async function saveSku(event) {
 
 async function editSku(styleCode, skuCode) {
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         const response = await fetch(`${API_BASE}/styles/${encodeURIComponent(styleCode)}/${encodeURIComponent(skuCode)}`);
         if (!response.ok) throw new Error('Failed to load SKU');
         
@@ -18514,7 +18700,7 @@ async function deleteSkuRecord(styleCode, skuCode) {
         async () => {
             try {
                 console.log(`Deleting SKU: styleCode="${styleCode}", skuCode="${skuCode}"`);
-                const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+                const API_BASE = window.API_BASE_URL || '/api';
                 const url = `${API_BASE}/styles/${encodeURIComponent(styleCode)}/${encodeURIComponent(skuCode)}`;
                 console.log('DELETE request URL:', url);
                 
@@ -18631,7 +18817,7 @@ async function saveItem(event) {
     };
     
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         let response;
         
         if (isEditMode) {
@@ -18679,7 +18865,7 @@ async function saveItem(event) {
 
 async function editItem(styleCode, skuCode, itemCode) {
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         const response = await fetch(`${API_BASE}/items/${encodeURIComponent(styleCode)}/${encodeURIComponent(skuCode)}/${encodeURIComponent(itemCode)}`);
         if (!response.ok) throw new Error('Failed to load item');
         
@@ -18731,7 +18917,7 @@ async function deleteItemRecord(styleCode, skuCode, itemCode) {
         `Are you sure you want to delete Item "${itemCode}"? This action cannot be undone.`,
         async () => {
             try {
-                const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+                const API_BASE = window.API_BASE_URL || '/api';
                 const response = await fetch(`${API_BASE}/items/${encodeURIComponent(styleCode)}/${encodeURIComponent(skuCode)}/${encodeURIComponent(itemCode)}`, {
                     method: 'DELETE'
                 });
@@ -21470,7 +21656,7 @@ function updateMobileUserInfo() {
     const mobileTallyConfig = document.getElementById('mobileTallyConfig');
     
     const permissions = currentUser?.permissions || {};
-    const isAdmin = permissions.isAdmin || currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
+    const isAdmin = permissions.isAdmin || currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || currentUser?.isMasterAdmin;
     
     if (mobileManageUsers) {
         mobileManageUsers.classList.toggle('hidden', !isAdmin);
@@ -21712,7 +21898,7 @@ async function checkForUpdates() {
     
     try {
         // Check for updates from server
-        const updateUrl = `${window.API_BASE_URL ? window.API_BASE_URL.replace('/api', '') : ''}/api/update/check`;
+        const updateUrl = '/api/update/check';
         const response = await fetch(updateUrl);
         const updateInfo = await response.json();
         

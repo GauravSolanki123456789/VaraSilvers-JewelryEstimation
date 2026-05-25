@@ -3,9 +3,7 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const { pool } = require('./database');
-
-// Super Admin email - ALWAYS allowed, auto-created if not exists
-const SUPER_ADMIN_EMAIL = 'jaigaurav56789@gmail.com';
+const { SUPER_ADMIN_EMAIL, isGoogleOAuthEnabled } = require('./auth-config');
 
 passport.serializeUser((user, done) => {
     done(null, user.id);
@@ -25,9 +23,10 @@ passport.deserializeUser(async (id, done) => {
     }
 });
 
+if (isGoogleOAuthEnabled()) {
 passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    clientID: String(process.env.GOOGLE_CLIENT_ID).trim(),
+    clientSecret: String(process.env.GOOGLE_CLIENT_SECRET).trim(),
     callbackURL: process.env.GOOGLE_CALLBACK_URL || '/auth/google/callback',
     proxy: true, // CRITICAL FOR NGINX HTTPS
     passReqToCallback: true
@@ -106,5 +105,8 @@ passport.use(new GoogleStrategy({
         return done(err, null);
     }
 }));
+} else {
+    console.warn('Google OAuth disabled: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set in .env');
+}
 
 module.exports = passport;

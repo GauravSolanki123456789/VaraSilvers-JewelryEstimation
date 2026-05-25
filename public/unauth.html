@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Access Denied - JP Jewellery Estimations</title>
+    <title>Access Denied - {{COMPANY_NAME}}</title>
+    {{BRANDING_SCRIPT}}
+    <script src="/js/branding.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -57,9 +59,7 @@
             <p class="text-amber-600 font-bold">jaigaurav56789@gmail.com</p>
         </div>
         
-        <div class="mt-4 text-xs text-gray-400">
-            © 2025 Gaurav Softwares. All rights reserved.
-        </div>
+        <div class="mt-4 text-xs text-gray-400" data-brand="copyright">{{COPYRIGHT}}</div>
     </div>
 
     <script>
@@ -124,10 +124,11 @@
             const userEmail = email || prompt('Enter your email address:');
             if (!userEmail) return;
             
-            const subject = encodeURIComponent('Access Request - JP Jewellery Estimations');
+            const brandName = (window.__BRANDING__ && window.__BRANDING__.companyName) || 'the system';
+            const subject = encodeURIComponent('Access Request - ' + brandName);
             const body = encodeURIComponent(`Hello,
 
-I would like to request access to the JP Jewellery Estimations system.
+I would like to request access to the ${brandName} system.
 
 Email: ${userEmail}
 Reason for access: [Please describe your role/purpose]

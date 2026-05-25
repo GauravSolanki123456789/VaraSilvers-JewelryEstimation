@@ -45,7 +45,7 @@ const StockInGrid = {
     // Fetch current metal rates
     async fetchCurrentRates() {
         try {
-            const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+            const API_BASE = window.API_BASE_URL || '/api';
             const response = await fetch(`${API_BASE}/rates`);
             if (response.ok) {
                 const data = await response.json();
@@ -317,7 +317,7 @@ const StockInGrid = {
         }
         
         try {
-            const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+            const API_BASE = window.API_BASE_URL || '/api';
             const response = await fetch(`${API_BASE}/styles/${encodeURIComponent(styleCode)}`);
             
             if (response.ok) {
@@ -457,7 +457,7 @@ const StockInGrid = {
         if (typeof showLoader === 'function') showLoader('Validating stock entries...');
         
         try {
-            const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+            const API_BASE = window.API_BASE_URL || '/api';
             const response = await fetch(`${API_BASE}/purchase-vouchers/validate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

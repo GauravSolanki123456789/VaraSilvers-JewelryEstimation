@@ -1,6 +1,8 @@
-require('dotenv').config();
-const express = require('express');
 const path = require('path');
+require('dotenv').config({
+    path: process.env.DOTENV_CONFIG_PATH || path.join(__dirname, '.env')
+});
+const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const http = require('http');
@@ -19,6 +21,9 @@ const { checkRole, checkAuth, checkAdmin, noCache, securityHeaders, getUserPermi
 const { hasPermission, getPermissionContext } = require('./middleware/checkPermission');
 const TallyIntegration = require('./config/tally-integration');
 const TallySyncService = require('./config/tally-sync-service');
+const { getBranding, serveBrandedHtml } = require('./config/branding');
+const { getUploadsDir, getUserDataDir, ensureWritableDir, resolveProductImagePath } = require('./config/paths');
+const { SUPER_ADMIN_EMAIL, isGoogleOAuthEnabled, getSessionCookieOptions } = require('./config/auth-config');
 const multer = require('multer');
 const fs = require('fs');
 const ExcelJS = require('exceljs');
@@ -32,24 +37,41 @@ const app = express();
 // X-Forwarded-Proto so secure cookies work behind SSL-terminating Nginx.
 // If your stack is: CDN → Nginx → Node, change this to 2.
 app.set('trust proxy', 1);
+const PORT = process.env.PORT || 3000;
+const CLIENT_URL = process.env.CLIENT_URL || `http://localhost:${PORT}`;
+
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: CLIENT_URL,
+        credentials: true,
         methods: ["GET", "POST"]
     }
 });
-const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: CLIENT_URL,
+    credentials: true
+}));
 app.use(express.json());
+
+// Health check — used by Electron to wait until the server is listening
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        companyName: getBranding().companyName,
+        port: PORT,
+        googleOAuthEnabled: isGoogleOAuthEnabled()
+    });
+});
 
 // Session and Passport Middleware
 // Sessions are persisted in PostgreSQL so they survive PM2 restarts/crashes.
 // Without a persistent store, every restart wipes all sessions and causes a
 // redirect loop (valid cookie → session not found → isAuthenticated() false → redirect).
 const isProduction = process.env.NODE_ENV === 'production';
+const sessionCookieOpts = getSessionCookieOptions();
 
 app.use(session({
     store: new pgSession({
@@ -66,11 +88,7 @@ app.use(session({
     saveUninitialized: false,
     name: 'jp.sid',
     cookie: {
-        // secure:true → browser only sends cookie over HTTPS.
-        // Relies on trust proxy + Nginx forwarding X-Forwarded-Proto: https.
-        secure: isProduction,
-        httpOnly: true,
-        sameSite: 'lax',
+        ...sessionCookieOpts,
         maxAge: 24 * 60 * 60 * 1000    // 24 hours
     }
 }));
@@ -197,6 +215,9 @@ app.get('/auth/google', async (req, res, next) => {
             res.status(500).send("Local login failed: " + error.message);
         }
     } else {
+        if (!isGoogleOAuthEnabled()) {
+            return res.redirect('/?error=google_not_configured');
+        }
         // 🔒 PRODUCTION: Strict Google Auth
         passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
     }
@@ -251,7 +272,8 @@ app.get('/api/auth/current_user', (req, res) => {
                 role: req.user.role,
                 account_status: req.user.account_status,
                 allowed_tabs: req.user.allowed_tabs || [],
-                permissions: req.user.permissions || {}
+                permissions: req.user.permissions || {},
+                isMasterAdmin: req.user.role === 'super_admin' || req.user.email === SUPER_ADMIN_EMAIL
             },
             // Legacy format for backward compatibility
             permissions: legacyPermissions,
@@ -297,15 +319,6 @@ app.post('/api/users/complete-profile', async (req, res) => {
 // ==========================================
 
 app.get('/api/auth/logout', (req, res) => {
-    // Cookie attributes must exactly match those used when the cookie was set
-    // otherwise some browsers silently refuse to delete it.
-    const sessionCookieOpts = {
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: isProduction
-    };
-
     req.logout((err) => {
         if (err) { console.error('Logout error:', err); }
 
@@ -327,13 +340,6 @@ app.get('/api/auth/logout', (req, res) => {
 });
 
 app.post('/api/auth/logout', (req, res) => {
-    const sessionCookieOpts = {
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: isProduction
-    };
-
     req.logout((err) => {
         if (err) {
             console.error('Logout error:', err);
@@ -357,16 +363,43 @@ app.post('/api/auth/logout', (req, res) => {
     });
 });
 
-// Static files
-app.use(express.static('public'));
+// ==========================================
+// WHITE-LABEL BRANDING
+// ==========================================
+
+app.get('/api/config/branding', (req, res) => {
+    res.json(getBranding());
+});
+
+app.get('/branding-config.js', (req, res) => {
+    res.type('application/javascript');
+    res.send(`window.__BRANDING__=${JSON.stringify(getBranding())};`);
+});
+
+const brandedHtmlRoutes = {
+    '/': 'index.html',
+    '/index.html': 'index.html',
+    '/admin-login.html': 'admin-login.html',
+    '/complete-profile.html': 'complete-profile.html',
+    '/unauth.html': 'unauth.html'
+};
+
+Object.entries(brandedHtmlRoutes).forEach(([route, file]) => {
+    app.get(route, (req, res) => serveBrandedHtml(res, file));
+});
+
+app.get('/admin.html', (req, res) => serveBrandedHtml(res, 'admin.html'));
+
+// Static files (HTML pages are served via branded routes above)
+app.use(express.static('public', { index: false }));
+
+// Writable uploads (outside read-only asar when packaged as desktop app)
+const uploadsDir = ensureWritableDir(getUploadsDir());
+app.use('/uploads/products', express.static(uploadsDir));
 
 // ==========================================
 // MULTER IMAGE UPLOAD CONFIG
 // ==========================================
-const uploadsDir = path.join(__dirname, 'public', 'uploads', 'products');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadsDir),
@@ -1024,81 +1057,146 @@ initDatabase().then(async success => {
 });
 
 // ==========================================
-// LOGIN API (Email/Password - No Tenant Code)
+// LOGIN API (username/email + password — creates Passport session)
 // ==========================================
+
+async function resolveAdminSessionUser() {
+    let result = await pool.query('SELECT * FROM users WHERE email = $1', [SUPER_ADMIN_EMAIL]);
+    if (result.rows.length > 0) {
+        const user = result.rows[0];
+        if (user.role !== 'super_admin') {
+            await pool.query(
+                'UPDATE users SET role = $1, account_status = $2, allowed_tabs = $3 WHERE email = $4',
+                ['super_admin', 'active', ['all'], SUPER_ADMIN_EMAIL]
+            );
+            user.role = 'super_admin';
+            user.account_status = 'active';
+            user.allowed_tabs = ['all'];
+        }
+        return user;
+    }
+
+    const created = await pool.query(
+        `INSERT INTO users (email, name, role, account_status, allowed_tabs, permissions)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [
+            SUPER_ADMIN_EMAIL,
+            'Super Admin',
+            'super_admin',
+            'active',
+            ['all'],
+            JSON.stringify({ all: true, modules: ['*'] })
+        ]
+    );
+    return created.rows[0];
+}
+
+function buildLoginPayload(user) {
+    const legacyPermissions = getUserPermissions(user);
+    const permissionContext = getPermissionContext(user);
+
+    let allowedTabs = user.allowed_tabs || ['all'];
+    if (typeof allowedTabs === 'string') {
+        try {
+            allowedTabs = JSON.parse(allowedTabs);
+        } catch (e) {
+            allowedTabs = allowedTabs.split(',').map(t => t.trim()).filter(Boolean);
+        }
+    }
+    if (!Array.isArray(allowedTabs)) {
+        allowedTabs = ['all'];
+    }
+
+    const isMasterAdmin = user.role === 'super_admin' ||
+        user.role === 'admin' ||
+        user.email === SUPER_ADMIN_EMAIL;
+
+    return {
+        success: true,
+        isAuthenticated: true,
+        isMasterAdmin,
+        username: user.username || user.email,
+        role: user.role || 'employee',
+        allowedTabs,
+        user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            account_status: user.account_status,
+            allowed_tabs: allowedTabs,
+            permissions: user.permissions || {}
+        },
+        permissions: legacyPermissions,
+        permissionContext
+    };
+}
+
+function establishPassportSession(req, user) {
+    return new Promise((resolve, reject) => {
+        req.login(user, (err) => {
+            if (err) reject(err);
+            else resolve();
+        });
+    });
+}
 
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { username, password } = req.body;
-        
+
         if (!username || !password) {
             return res.status(400).json({ error: 'Username and password required' });
         }
 
-        // Check admin_users table first (super admin)
+        const loginId = String(username).trim();
+
+        // 1) Master admin table (admin_users)
         const adminResult = await pool.query(
             'SELECT * FROM admin_users WHERE username = $1',
-            [username]
+            [loginId]
         );
-        
+
         if (adminResult.rows.length > 0) {
             const admin = adminResult.rows[0];
             const isValid = await bcrypt.compare(password, admin.password_hash);
             if (isValid) {
-                return res.json({
-                    success: true,
-                    username: admin.username,
-                    role: 'super_admin',
-                    allowedTabs: ['all'],
-                    isMasterAdmin: true
-                });
+                const sessionUser = await resolveAdminSessionUser();
+                await establishPassportSession(req, sessionUser);
+                return res.json(buildLoginPayload(sessionUser));
             }
         }
-        
-        // Check regular users table
+
+        // 2) Regular users table (email or username + password)
         const userResult = await pool.query(
             'SELECT * FROM users WHERE (username = $1 OR email = $1)',
-            [username]
+            [loginId]
         );
-        
+
         if (userResult.rows.length > 0) {
             const user = userResult.rows[0];
-            
-            // Check if password field exists and is hashed
+
+            if (user.account_status === 'rejected' || user.account_status === 'suspended') {
+                return res.status(403).json({ error: 'Your account has been suspended. Contact admin.' });
+            }
+
             if (user.password) {
                 let passwordValid = false;
                 if (user.password.startsWith('$2')) {
                     passwordValid = await bcrypt.compare(password, user.password);
-                } else {
-                    // Legacy plain text - migrate to hashed
-                    if (password === user.password) {
-                        const hashedPassword = await bcrypt.hash(password, 10);
-                        await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, user.id]);
-                        passwordValid = true;
-                    }
+                } else if (password === user.password) {
+                    const hashedPassword = await bcrypt.hash(password, 10);
+                    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, user.id]);
+                    passwordValid = true;
                 }
-                
+
                 if (passwordValid) {
-                    let allowedTabs = user.allowed_tabs || ['all'];
-                    if (typeof allowedTabs === 'string') {
-                        try {
-                            allowedTabs = JSON.parse(allowedTabs);
-                        } catch (e) {
-                            allowedTabs = allowedTabs.split(',').map(t => t.trim()).filter(t => t);
-                        }
-                    }
-                    
-                    return res.json({
-                        success: true,
-                        username: user.username || user.email,
-                        role: user.role || 'employee',
-                        allowedTabs: allowedTabs,
-                        isMasterAdmin: false
-                    });
+                    await establishPassportSession(req, user);
+                    return res.json(buildLoginPayload(user));
                 }
             }
         }
-        
+
         res.status(401).json({ error: 'Invalid credentials' });
     } catch (error) {
         console.error('Login error:', error);
@@ -3021,7 +3119,7 @@ app.get('/api/admin/permission-modules', checkRole('admin'), (req, res) => {
 // Add user to whitelist (pre-approve email) with permissions
 app.post('/api/admin/add-user', checkRole('admin'), async (req, res) => {
     try {
-        const { email, name, role, allowed_tabs, permissions: requestPermissions } = req.body;
+        const { email, name, role, allowed_tabs, permissions: requestPermissions, password: rawPassword } = req.body;
         
         if (!email) {
             return res.status(400).json({ error: 'Email is required' });
@@ -3064,11 +3162,19 @@ app.post('/api/admin/add-user', checkRole('admin'), async (req, res) => {
             ...(requestPermissions || {}) // Merge custom permissions like no2_access
         };
         
+        let passwordHash = null;
+        if (rawPassword && String(rawPassword).trim()) {
+            if (String(rawPassword).trim().length < 6) {
+                return res.status(400).json({ error: 'Password must be at least 6 characters' });
+            }
+            passwordHash = await bcrypt.hash(String(rawPassword).trim(), 10);
+        }
+
         // Insert new user with permissions
         const result = await query(
-            `INSERT INTO users (email, name, role, account_status, allowed_tabs, permissions, created_at) 
-             VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP) RETURNING *`,
-            [email.toLowerCase(), name || 'New User', userRole, 'active', userAllowedTabs, JSON.stringify(permissions)]
+            `INSERT INTO users (email, name, role, account_status, allowed_tabs, permissions, password, created_at) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP) RETURNING *`,
+            [email.toLowerCase(), name || 'New User', userRole, 'active', userAllowedTabs, JSON.stringify(permissions), passwordHash]
         );
         
         console.log(`✅ User whitelisted by admin: ${email} (Role: ${userRole}, Tabs: ${userAllowedTabs.join(', ')})`);
@@ -3621,9 +3727,7 @@ app.get('/api/users', checkRole('admin'), async (req, res) => {
 // Add user to whitelist (Google OAuth - no password)
 app.post('/api/users', checkRole('admin'), async (req, res) => {
     try {
-        const { email, name, role, allowedTabs } = req.body;
-        
-        // Validate email
+        const { email, name, role, allowedTabs, password: rawPassword } = req.body;
         if (!email || !email.trim()) {
             return res.status(400).json({ error: 'Email is required' });
         }
@@ -3644,12 +3748,17 @@ app.post('/api/users', checkRole('admin'), async (req, res) => {
         const validRoles = ['admin', 'employee'];
         const userRole = role && validRoles.includes(role.toLowerCase()) ? role.toLowerCase() : 'employee';
         
-        // Insert new whitelisted user (no password - Google OAuth only)
+        // Insert new user (optional password for desktop login)
+        let passwordHash = null;
+        if (rawPassword && String(rawPassword).trim()) {
+            passwordHash = await bcrypt.hash(String(rawPassword).trim(), 10);
+        }
+
         const result = await query(`
-            INSERT INTO users (email, name, role, allowed_tabs, account_status, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
+            INSERT INTO users (email, name, role, allowed_tabs, account_status, password, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, 'active', $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
             RETURNING id, email, name, role, allowed_tabs, account_status, created_at
-        `, [emailLower, name || 'New User', userRole, allowedTabs || ['all']]);
+        `, [emailLower, name || 'New User', userRole, allowedTabs || ['all'], passwordHash]);
         
         console.log(`✅ User whitelisted: ${emailLower} (Role: ${userRole})`);
         broadcast('user-created', result[0]);
@@ -5035,7 +5144,7 @@ app.get('/api/sync/pending', checkAuth, async (req, res) => {
                 imgPath = path.join(__dirname, 'public', imageUrl.replace(/^\//, ''));
             }
             if (!imgPath || !fs.existsSync(imgPath)) {
-                imgPath = path.join(__dirname, 'public', 'uploads', 'products', `${p.barcode}.jpg`);
+                imgPath = resolveProductImagePath(p.barcode);
             }
             if (fs.existsSync(imgPath)) {
                 let hasSecondaryImage = false;
@@ -5105,9 +5214,9 @@ app.post('/api/sync/execute', checkAuth, async (req, res) => {
             let imageUrl = await resolveProductImage(p.barcode);
             let imgPath = imageUrl
                 ? path.join(__dirname, 'public', imageUrl.replace(/^\//, ''))
-                : path.join(__dirname, 'public', 'uploads', 'products', `${p.barcode}.jpg`);
+                : resolveProductImagePath(p.barcode);
             if (!fs.existsSync(imgPath)) {
-                imgPath = path.join(__dirname, 'public', 'uploads', 'products', `${p.barcode}.jpg`);
+                imgPath = resolveProductImagePath(p.barcode);
             }
             if (!fs.existsSync(imgPath)) {
                 console.warn(`KC Sync: no image for barcode ${p.barcode}, skipping.`);
@@ -5266,18 +5375,23 @@ app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) {
         return res.status(404).json({ error: 'API endpoint not found', success: false });
     }
-    res.sendFile(path.join(__dirname, 'public/index.html'));
+    serveBrandedHtml(res, 'index.html');
 });
 
 // ==========================================
 // START SERVER
 // ==========================================
 
-const DOMAIN = process.env.DOMAIN || 'localhost';
-const PROTOCOL = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-const BASE_URL = process.env.NODE_ENV === 'production' 
-  ? `${PROTOCOL}://${DOMAIN}` 
-  : `http://localhost:${PORT}`;
+const BASE_URL = CLIENT_URL;
+
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use. Close other Vara Silvers / node instances and try again.`);
+        process.exit(1);
+    }
+    console.error('❌ Server error:', err.message);
+    process.exit(1);
+});
 
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ Server running on port ${PORT}`);
@@ -5285,7 +5399,19 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`📊 API available at ${BASE_URL}/api`);
     console.log(`🔄 Self-Update API: ${BASE_URL}/api/update-software`);
     console.log(`🔌 Real-time sync enabled (Socket.IO)`);
+    console.log(`🏷️  White-label: ${getBranding().companyName}`);
     if (process.env.NODE_ENV === 'production') {
         console.log(`☁️ Production mode active`);
     }
 });
+
+function shutdownServer(signal) {
+    console.log(`\n${signal} received — shutting down gracefully...`);
+    server.close(() => {
+        pool.end().then(() => process.exit(0)).catch(() => process.exit(0));
+    });
+    setTimeout(() => process.exit(1), 10000);
+}
+
+process.on('SIGTERM', () => shutdownServer('SIGTERM'));
+process.on('SIGINT', () => shutdownServer('SIGINT'));

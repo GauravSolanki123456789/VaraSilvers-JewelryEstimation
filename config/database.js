@@ -1,6 +1,6 @@
 // Database Configuration for Single-Tenant Architecture
 // Each client gets their own VPS with one database
-require('dotenv').config();
+require('./load-env');
 const { Pool } = require('pg');
 
 // Single database connection using DATABASE_URL or individual env vars

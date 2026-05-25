@@ -24,7 +24,7 @@ const TagOps = {
     
     // API Base
     get API_BASE() {
-        return window.API_BASE_URL || 'http://localhost:3000/api';
+        return window.API_BASE_URL || '/api';
     },
 
     // ==========================================

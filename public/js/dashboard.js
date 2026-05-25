@@ -342,7 +342,7 @@ function initShadowMode() {
 // Refresh quotation list based on current mode
 async function refreshQuotationListForMode() {
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
+        const API_BASE = window.API_BASE_URL || '/api';
         const response = await fetch(`${API_BASE}/quotations?type=${currentAppMode}`);
         
         if (response.ok) {
@@ -604,7 +604,7 @@ const UserManagement = {
     
     // API Base
     get API_BASE() {
-        return window.API_BASE_URL || 'http://localhost:3000/api';
+        return window.API_BASE_URL || '/api';
     },
 
     // ==========================================
@@ -621,7 +621,7 @@ const UserManagement = {
         // Only fetch when user is authenticated (avoids 401 on login screen)
         if (!window.currentUser) return;
         try {
-            const response = await fetch(`${this.API_BASE}/admin/permission-modules`);
+            const response = await fetch(`${this.API_BASE}/admin/permission-modules`, { credentials: 'include' });
             if (response.ok) {
                 const data = await response.json();
                 this.modules = data.modules || [];
@@ -684,7 +684,7 @@ const UserManagement = {
                                     <input type="email" id="userEmail" required
                                         class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                                         placeholder="user@example.com">
-                                    <p class="text-xs text-gray-500 mt-1">User will login via Google with this email</p>
+                                    <p class="text-xs text-gray-500 mt-1">Used as login ID (email or username)</p>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
@@ -699,6 +699,13 @@ const UserManagement = {
                                         <option value="employee">Employee</option>
                                         <option value="admin">Admin</option>
                                     </select>
+                                </div>
+                                <div class="col-span-2" id="passwordSection">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Login Password *</label>
+                                    <input type="password" id="userPassword" minlength="6" autocomplete="new-password"
+                                        class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+                                        placeholder="Initial password (min 6 characters)">
+                                    <p class="text-xs text-gray-500 mt-1">User signs in with email + this password</p>
                                 </div>
                             </div>
                         </div>
@@ -832,6 +839,9 @@ const UserManagement = {
     // ==========================================
 
     async openAddModal() {
+        if (!document.getElementById('userPermissionsModal')) {
+            this.setupModal();
+        }
         // Lazy-load permission modules if not yet fetched (e.g. page refresh, failed preload)
         if (this.modules.length === 0 && window.currentUser) {
             await this.fetchPermissionModules();
@@ -846,6 +856,8 @@ const UserManagement = {
         document.getElementById('permissionStepNumber').textContent = '2';
         document.getElementById('userEmail').removeAttribute('readonly');
         document.getElementById('userEmail').classList.remove('bg-gray-100');
+        document.getElementById('passwordSection')?.classList.remove('hidden');
+        document.getElementById('userPassword')?.setAttribute('required', 'required');
         document.getElementById('saveUserBtn').textContent = '💾 Add User';
         
         document.getElementById('userPermissionsModal').classList.remove('hidden');
@@ -877,6 +889,8 @@ const UserManagement = {
         const emailInput = document.getElementById('userEmail');
         emailInput.setAttribute('readonly', 'true');
         emailInput.classList.add('bg-gray-100');
+        document.getElementById('passwordSection')?.classList.add('hidden');
+        document.getElementById('userPassword')?.removeAttribute('required');
         
         // Set permissions
         const allowedTabs = user.allowed_tabs || [];
@@ -975,6 +989,7 @@ const UserManagement = {
         const status = document.getElementById('userStatus')?.value || 'active';
         const fullAccess = document.getElementById('fullAccessToggle').checked;
         const no2Access = document.getElementById('no2AccessToggle')?.checked || false;
+        const password = document.getElementById('userPassword')?.value || '';
         
         // Collect selected modules
         let allowedTabs = [];
@@ -999,6 +1014,11 @@ const UserManagement = {
             return;
         }
         
+        if (!userId && (!password || password.length < 6)) {
+            this.showNotification('Password is required (minimum 6 characters)', 'error');
+            return;
+        }
+        
         if (allowedTabs.length === 0) {
             this.showNotification('Please select at least one module permission', 'error');
             return;
@@ -1017,6 +1037,7 @@ const UserManagement = {
                 response = await fetch(`${this.API_BASE}/admin/users/${userId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({
                         name,
                         role,
@@ -1030,10 +1051,12 @@ const UserManagement = {
                 response = await fetch(`${this.API_BASE}/admin/add-user`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({
                         email,
                         name,
                         role,
+                        password,
                         allowed_tabs: allowedTabs,
                         permissions: permissions
                     })
@@ -1080,7 +1103,8 @@ const UserManagement = {
         
         try {
             const response = await fetch(`${this.API_BASE}/admin/users/${userId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                credentials: 'include'
             });
             
             const result = await response.json();
@@ -1121,6 +1145,7 @@ const UserManagement = {
         };
         const roleColors = {
             'admin': 'bg-purple-100 text-purple-800',
+            'super_admin': 'bg-yellow-100 text-yellow-800',
             'employee': 'bg-blue-100 text-blue-800'
         };
         
@@ -1138,7 +1163,7 @@ const UserManagement = {
                 <td class="p-3 text-gray-600">${user.name || '-'}</td>
                 <td class="p-3">
                     <span class="px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role] || 'bg-gray-100'}">
-                        ${user.role === 'admin' ? '👑 Admin' : '👤 Employee'}
+                        ${user.role === 'super_admin' ? '🔐 Super Admin' : user.role === 'admin' ? '👑 Admin' : '👤 Employee'}
                     </span>
                 </td>
                 <td class="p-3">
@@ -1257,8 +1282,8 @@ window.loadWhitelistedUsers = async function() {
     userListDiv.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">Loading users...</td></tr>';
     
     try {
-        const API_BASE = window.API_BASE_URL || 'http://localhost:3000/api';
-        const response = await fetch(`${API_BASE}/admin/users`);
+        const API_BASE = window.API_BASE_URL || '/api';
+        const response = await fetch(`${API_BASE}/admin/users`, { credentials: 'include' });
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
@@ -1270,7 +1295,7 @@ window.loadWhitelistedUsers = async function() {
         // Calculate stats
         const totalCount = users.length || 0;
         const activeCount = users.filter(u => u.account_status === 'active').length;
-        const adminCount = users.filter(u => u.role === 'admin').length;
+        const adminCount = users.filter(u => u.role === 'admin' || u.role === 'super_admin').length;
         const pendingCount = users.filter(u => u.account_status === 'pending').length;
         
         // Update all counters

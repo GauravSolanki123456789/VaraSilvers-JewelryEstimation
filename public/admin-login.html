@@ -3,14 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - JP Jewellery Estimations</title>
+    <title>Admin Login - {{COMPANY_NAME}}</title>
+    {{BRANDING_SCRIPT}}
+    <script src="/js/branding.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen flex items-center justify-center">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-8">
+<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8">
         <div class="text-center mb-8">
-            <div class="text-4xl font-bold text-gray-800 mb-2">🔒 Admin Panel</div>
-            <div class="text-xl text-gray-600 mb-6">Administrator Access</div>
+            <div id="brandInitials" class="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-xl sm:text-2xl font-bold shadow-lg" aria-hidden="true"></div>
+            <div class="text-2xl sm:text-4xl font-bold text-gray-800 mb-2" data-brand="companyName">{{COMPANY_NAME}}</div>
+            <div class="text-lg sm:text-xl text-gray-600 mb-2">🔒 Admin Panel</div>
+            <div class="text-sm text-gray-500 mb-4">Administrator Access</div>
             <div class="h-1 w-24 bg-amber-600 mx-auto"></div>
         </div>
         
@@ -25,7 +29,7 @@
                     <input type="text" id="adminUsername" required
                         class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition"
                         autofocus placeholder="Enter admin username">
-                    <p class="text-xs text-gray-500 mt-1">💡 Default: Gaurav</p>
+                    <p class="text-xs text-gray-500 mt-1">Enter your administrator username</p>
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Password</label>
@@ -89,7 +93,7 @@
                     // Regular user - redirect to main dashboard
                     window.location.href = '/';
                 } else {
-                    errorText.textContent = apiData.error || 'Invalid admin credentials. Please verify:\n1. Username is correct (default: Gaurav)\n2. Password is correct\n3. Admin is set up (run: npm run change-master-password)';
+                    errorText.textContent = apiData.error || 'Invalid admin credentials. Please verify your username and password, or run: npm run change-master-password';
                     errorDiv.classList.remove('hidden');
                 }
             } catch (error) {
