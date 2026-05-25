@@ -11,6 +11,15 @@ Upgrade Start Menu App
 .\clean-and-build.ps1 -Install
 
 Send Update to remote client
+.\publish-release.ps1
+
+Port 3001 busy
+taskkill /F /IM "Vara Silvers.exe"
+taskkill /F /IM node.exe
+
+Run unpacked exe (Powershell)
+build-out\win-unpacked\Vara Silvers.exe
+
 1. Create GitHub token: GitHub → Settings → Developer settings → Personal access tokens → `repo` scope
 2. In PowerShell (same session or set permanently):
 

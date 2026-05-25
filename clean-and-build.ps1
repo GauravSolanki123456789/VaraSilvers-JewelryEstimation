@@ -27,7 +27,7 @@ param(
 $ErrorActionPreference = "Continue"
 Set-Location $PSScriptRoot
 
-Write-Host "`n=== Vara Silvers — clean and build ===" -ForegroundColor Cyan
+Write-Host "`n=== Vara Silvers - clean and build ===" -ForegroundColor Cyan
 
 # 1. Kill every possible lock holder
 Write-Host "[1/5] Stopping running app processes..."
@@ -54,7 +54,8 @@ Write-Host "[4/5] Copying .env to AppData..."
 npm run copy-env-appdata
 
 # 5. Launch
-$installer = Join-Path $PSScriptRoot "build-out\Vara Silvers-Setup-2.5.0.exe"
+$version   = (Get-Content (Join-Path $PSScriptRoot "package.json") -Raw | ConvertFrom-Json).version
+$installer = Join-Path $PSScriptRoot "build-out\Vara Silvers-Setup-$version.exe"
 $unpacked  = Join-Path $PSScriptRoot "build-out\win-unpacked\Vara Silvers.exe"
 
 if ($Install) {
@@ -76,11 +77,12 @@ if ($Install) {
         exit 1
     }
 } else {
-    Write-Host "[5/5] Build complete." -ForegroundColor Green
+    Write-Host '[5/5] Build complete.' -ForegroundColor Green
     Write-Host "  Installer: $installer"
     Write-Host "  Test exe:  $unpacked"
-    Write-Host "`nNext: .\clean-and-build.ps1 -Run     (test without installing)"
-    Write-Host "  or: .\clean-and-build.ps1 -Install  (upgrade Start Menu app)"
+    Write-Host ''
+    Write-Host 'Next: .\clean-and-build.ps1 -Run     (test without installing)'
+    Write-Host '  or: .\clean-and-build.ps1 -Install  (upgrade Start Menu app)'
 }
 
 Write-Host ""
