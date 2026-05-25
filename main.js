@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, shell } = require('electron');
+const { app, BrowserWindow, dialog, shell, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -18,6 +18,7 @@ const {
 let mainWindow = null;
 let serverProcess = null;
 let isQuitting = false;
+let autoUpdaterInstance = null;
 
 const isDevMode = process.env.ELECTRON_DEV === '1';
 const shouldSpawnServer = app.isPackaged || process.env.ELECTRON_START_SERVER === '1';
@@ -193,6 +194,7 @@ function createMainWindow(serverUrl) {
         backgroundColor: '#111827',
         icon: path.join(__dirname, 'build', 'icon.png'),
         webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
             sandbox: false
@@ -232,41 +234,74 @@ function createMainWindow(serverUrl) {
     });
 }
 
+function configureAutoUpdaterAuth(autoUpdater) {
+    bootstrapEnv();
+    const token = process.env.GITHUB_UPDATE_TOKEN || process.env.GH_TOKEN;
+    if (token) {
+        process.env.GH_TOKEN = token;
+        autoUpdater.requestHeaders = {
+            Authorization: `token ${token}`,
+            Accept: 'application/vnd.github+json',
+            'User-Agent': 'VaraSilvers-Updater'
+        };
+        console.log('[Auto-updater] GitHub token configured for private repo.');
+    } else {
+        console.warn('[Auto-updater] GITHUB_UPDATE_TOKEN not set — private GitHub releases may not be detected.');
+    }
+}
+
+function promptForUpdateDownload(info) {
+    return dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Update Available',
+        message: 'A new version of Vara Silvers is available.',
+        detail: `Current: ${app.getVersion()}\nNew: ${info.version}\n\nDownload and install now?`,
+        buttons: ['Download and Install', 'Later'],
+        defaultId: 0,
+        cancelId: 1
+    }).then(({ response }) => response === 0);
+}
+
+function promptForUpdateInstall() {
+    return dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Update Ready',
+        message: 'The update has been downloaded.',
+        detail: 'Restart now to install the new version?',
+        buttons: ['Restart Now', 'Later'],
+        defaultId: 0,
+        cancelId: 1
+    }).then(({ response }) => response === 0);
+}
+
 function setupAutoUpdater() {
     if (!app.isPackaged) return;
 
     try {
+        configureAutoUpdaterAuth();
         const { autoUpdater } = require('electron-updater');
+        autoUpdaterInstance = autoUpdater;
 
         autoUpdater.autoDownload = false;
+        autoUpdater.autoInstallOnAppQuit = true;
         autoUpdater.logger = console;
 
         autoUpdater.on('update-available', (info) => {
-            dialog.showMessageBox(mainWindow, {
-                type: 'info',
-                title: 'Update Available',
-                message: 'An update is available. Download and install?',
-                detail: `Version ${info.version} is ready to download.`,
-                buttons: ['Download and Install', 'Later'],
-                defaultId: 0,
-                cancelId: 1
-            }).then(({ response }) => {
-                if (response === 0) {
+            console.log('[Auto-updater] Update available:', info.version);
+            promptForUpdateDownload(info).then((shouldDownload) => {
+                if (shouldDownload) {
                     autoUpdater.downloadUpdate();
                 }
             });
         });
 
+        autoUpdater.on('update-not-available', (info) => {
+            console.log('[Auto-updater] Already on latest version:', info?.version || app.getVersion());
+        });
+
         autoUpdater.on('update-downloaded', () => {
-            dialog.showMessageBox(mainWindow, {
-                type: 'info',
-                title: 'Update Ready',
-                message: 'The update has been downloaded. Restart now to install?',
-                buttons: ['Restart Now', 'Later'],
-                defaultId: 0,
-                cancelId: 1
-            }).then(({ response }) => {
-                if (response === 0) {
+            promptForUpdateInstall().then((shouldRestart) => {
+                if (shouldRestart) {
                     isQuitting = true;
                     stopServerProcess();
                     autoUpdater.quitAndInstall(false, true);
@@ -275,23 +310,51 @@ function setupAutoUpdater() {
         });
 
         autoUpdater.on('error', (error) => {
-            if (error.message && error.message.includes('No published versions')) {
-                console.log('Auto-updater: no releases published yet (this is normal before first publish).');
+            const message = error?.message || String(error);
+            if (message.includes('No published versions')) {
+                console.log('[Auto-updater] No published GitHub release found yet.');
                 return;
             }
-            console.error('Auto-updater error:', error.message);
+            if (message.includes('404')) {
+                console.error('[Auto-updater] Release not found (404). Ensure release is Published (not Draft) and GITHUB_UPDATE_TOKEN is set.');
+                return;
+            }
+            console.error('[Auto-updater] Error:', message);
         });
 
-        autoUpdater.checkForUpdates().catch((error) => {
-            if (error.message && error.message.includes('No published versions')) {
-                console.log('Auto-updater: no releases published yet (this is normal before first publish).');
-                return;
-            }
-            console.error('Update check failed:', error.message);
-        });
+        setTimeout(() => {
+            autoUpdater.checkForUpdates().catch((error) => {
+                console.error('[Auto-updater] Check failed:', error.message);
+            });
+        }, 4000);
     } catch (error) {
-        console.error('Auto-updater unavailable:', error.message);
+        console.error('[Auto-updater] Unavailable:', error.message);
     }
+}
+
+async function checkForUpdatesManually() {
+    if (!app.isPackaged || !autoUpdaterInstance) {
+        return { success: false, message: 'Auto-update only runs in the installed desktop app.' };
+    }
+
+    try {
+        const result = await autoUpdaterInstance.checkForUpdates();
+        const updateInfo = result?.updateInfo;
+        const current = app.getVersion();
+        const latest = updateInfo?.version;
+
+        if (latest && latest !== current) {
+            return { success: true, updateAvailable: true, currentVersion: current, latestVersion: latest };
+        }
+        return { success: true, updateAvailable: false, currentVersion: current, latestVersion: latest || current };
+    } catch (error) {
+        return { success: false, message: error.message };
+    }
+}
+
+function registerIpcHandlers() {
+    ipcMain.handle('app:getVersion', () => app.getVersion());
+    ipcMain.handle('app:checkForUpdates', () => checkForUpdatesManually());
 }
 
 async function launchApplication() {
@@ -339,6 +402,8 @@ async function launchApplication() {
 }
 
 function initApp() {
+    registerIpcHandlers();
+
     app.on('second-instance', () => {
         if (mainWindow) {
             if (mainWindow.isMinimized()) mainWindow.restore();

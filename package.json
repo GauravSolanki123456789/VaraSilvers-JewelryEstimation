@@ -1,6 +1,6 @@
 {
   "name": "jewelry-estimation",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "description": "Single-Tenant Jewelry Estimation Software with Self-Update",
   "author": "Gaurav Softwares",
   "main": "main.js",
@@ -71,6 +71,7 @@
     },
     "files": [
       "main.js",
+      "preload.js",
       "electron.js",
       "electron-env.js",
       "server.js",
@@ -122,7 +123,8 @@
         "provider": "github",
         "owner": "GauravSolanki123456789",
         "repo": "VaraSilvers-JewelryEstimation",
-        "private": true
+        "private": true,
+        "releaseType": "release"
       }
     ]
   }

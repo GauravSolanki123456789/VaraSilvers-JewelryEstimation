@@ -6594,6 +6594,8 @@ async function loadDataFromAPI() {
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
+    await loadAppVersionFromServer();
+
     // Reload AUTH_USERS from cache to get latest users (legacy support)
     AUTH_USERS = getCachedItem('authUsers', {
         'admin': { role: 'admin', allowedTabs: ['all'] },
@@ -21718,7 +21720,21 @@ async function b2bExportExcel() {
     }
 }
 
-let currentAppVersion = '2.5.0'; // Gold Master Release - January 2025
+let currentAppVersion = '2.5.2';
+
+async function loadAppVersionFromServer() {
+    try {
+        const response = await fetch('/api/health', { credentials: 'include' });
+        if (response.ok) {
+            const data = await response.json();
+            if (data.version) {
+                currentAppVersion = data.version;
+            }
+        }
+    } catch (e) {
+        console.warn('Could not load app version from server');
+    }
+}
 
 // ==========================================
 // MOBILE SETTINGS DROPDOWN FUNCTIONS
@@ -21988,44 +22004,60 @@ async function updateSoftware() {
 
 async function checkForUpdates() {
     const btn = document.getElementById('btnUpdateSW');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '🔄 Checking...';
-    btn.disabled = true;
-    
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.innerHTML = '🔄 Checking...';
+        btn.disabled = true;
+    }
+
     try {
-        // Check for updates from server
-        const updateUrl = '/api/update/check';
-        const response = await fetch(updateUrl);
+        if (window.electronAPI?.checkForUpdates) {
+            const result = await window.electronAPI.checkForUpdates();
+            if (!result.success) {
+                showDialog('Update Check', result.message || 'Could not check for updates.', 'warning');
+                return;
+            }
+            if (result.updateAvailable) {
+                showDialog(
+                    'Update Available',
+                    `Version ${result.latestVersion} is available.\nYou are on ${result.currentVersion}.\n\nFollow the download prompt to install.`,
+                    'info'
+                );
+            } else {
+                showSuccessMessage(`You are on the latest version (${result.currentVersion}).`);
+            }
+            return;
+        }
+
+        await loadAppVersionFromServer();
+        const response = await fetch('/api/update/check', { credentials: 'include' });
         const updateInfo = await response.json();
-        
+
+        if (updateInfo.draftRelease) {
+            showDialog('Update Pending', updateInfo.releaseNotes || 'GitHub release is still a draft.', 'warning');
+            return;
+        }
+
         if (updateInfo.available && updateInfo.version !== currentAppVersion) {
             const shouldUpdate = confirm(
-                `🔄 Update Available!\n\n` +
-                `Current Version: ${currentAppVersion}\n` +
-                `New Version: ${updateInfo.version}\n\n` +
-                `Release Notes: ${updateInfo.releaseNotes || 'Latest update with improvements'}\n\n` +
-                `Would you like to pull the latest updates from GitHub now?`
+                `Update Available!\n\nCurrent: ${currentAppVersion}\nNew: ${updateInfo.version}\n\nInstall the latest desktop build from GitHub Releases.`
             );
-            
-            if (shouldUpdate) {
-                await updateSoftware();
+            if (shouldUpdate && updateInfo.error) {
+                showDialog('Update', updateInfo.releaseNotes, 'info');
             }
+        } else if (updateInfo.error) {
+            showDialog('Update Check', updateInfo.releaseNotes || updateInfo.error, 'warning');
         } else {
-            showSuccessMessage('✅ You are using the latest version!');
+            showSuccessMessage(`You are on the latest version (${currentAppVersion}).`);
         }
     } catch (error) {
         console.error('Update check failed:', error);
-        // If check fails, offer to update anyway
-        const shouldUpdate = confirm(
-            '⚠️ Could not check for updates.\n\n' +
-            'Would you like to pull the latest updates from GitHub anyway?'
-        );
-        if (shouldUpdate) {
-            await updateSoftware();
-        }
+        showDialog('Update Check', 'Could not check for updates. Ensure GITHUB_UPDATE_TOKEN is set in .env.', 'warning');
     } finally {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
+        if (btn) {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
     }
 }
 

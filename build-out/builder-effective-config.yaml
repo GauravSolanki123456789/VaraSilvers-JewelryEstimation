@@ -7,6 +7,7 @@ copyright: Copyright © ${author}
 files:
   - filter:
       - main.js
+      - preload.js
       - electron.js
       - electron-env.js
       - server.js
@@ -50,4 +51,5 @@ publish:
     owner: GauravSolanki123456789
     repo: VaraSilvers-JewelryEstimation
     private: true
+    releaseType: release
 electronVersion: 33.4.0

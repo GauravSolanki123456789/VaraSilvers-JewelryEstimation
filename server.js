@@ -58,10 +58,13 @@ app.use(express.json());
 
 // Health check — used by Electron to wait until the server is listening
 app.get('/api/health', (req, res) => {
+    const pkg = require('./package.json');
     res.json({
         status: 'ok',
+        version: pkg.version,
         companyName: getBranding().companyName,
         port: PORT,
+        isDesktopApp: Boolean(process.env.APP_USER_DATA),
         googleOAuthEnabled: isGoogleOAuthEnabled()
     });
 });
@@ -1299,52 +1302,69 @@ app.get('/api/update/check', async (req, res) => {
     try {
         const packageJson = require('./package.json');
         const currentVersion = packageJson.version;
-        
-        const githubRepo = process.env.GITHUB_REPO;
-        
-        if (githubRepo) {
-            try {
-                const https = require('https');
-                const githubUrl = `https://api.github.com/repos/${githubRepo}/releases/latest`;
-                
-                const githubResponse = await new Promise((resolve, reject) => {
-                    https.get(githubUrl, {
-                        headers: { 'User-Agent': 'JP-Jewellery-Estimations' }
-                    }, (res) => {
-                        let data = '';
-                        res.on('data', chunk => data += chunk);
-                        res.on('end', () => {
-                            if (res.statusCode === 200) {
-                                resolve(JSON.parse(data));
-                            } else {
-                                reject(new Error(`GitHub API returned ${res.statusCode}`));
-                            }
-                        });
-                    }).on('error', reject);
-                });
-                
-                const latestVersion = githubResponse.tag_name.replace(/^v/i, '');
-                const updateAvailable = latestVersion !== currentVersion;
-                
+        const githubRepo = process.env.GITHUB_REPO || 'GauravSolanki123456789/VaraSilvers-JewelryEstimation';
+        const githubToken = process.env.GITHUB_UPDATE_TOKEN || process.env.GH_TOKEN;
+
+        try {
+            const https = require('https');
+            const githubUrl = `https://api.github.com/repos/${githubRepo}/releases/latest`;
+
+            const githubResponse = await new Promise((resolve, reject) => {
+                const headers = {
+                    'User-Agent': 'VaraSilvers-Updater',
+                    Accept: 'application/vnd.github+json'
+                };
+                if (githubToken) {
+                    headers.Authorization = `token ${githubToken}`;
+                }
+
+                https.get(githubUrl, { headers }, (apiRes) => {
+                    let data = '';
+                    apiRes.on('data', chunk => data += chunk);
+                    apiRes.on('end', () => {
+                        if (apiRes.statusCode === 200) {
+                            resolve(JSON.parse(data));
+                        } else {
+                            reject(new Error(`GitHub API returned ${apiRes.statusCode}: ${data.slice(0, 200)}`));
+                        }
+                    });
+                }).on('error', reject);
+            });
+
+            if (githubResponse.draft) {
                 return res.json({
-                    available: updateAvailable,
-                    version: latestVersion,
-                    currentVersion: currentVersion,
-                    releaseNotes: githubResponse.body || 'Latest update with improvements',
-                    mandatory: false
+                    available: false,
+                    version: currentVersion,
+                    currentVersion,
+                    releaseNotes: 'Latest GitHub release is still a draft. Publish it on GitHub to enable auto-update.',
+                    mandatory: false,
+                    draftRelease: true
                 });
-            } catch (githubError) {
-                console.error('GitHub check failed:', githubError);
             }
+
+            const latestVersion = String(githubResponse.tag_name || '').replace(/^v/i, '');
+            const updateAvailable = latestVersion && latestVersion !== currentVersion;
+
+            return res.json({
+                available: updateAvailable,
+                version: latestVersion || currentVersion,
+                currentVersion,
+                releaseNotes: githubResponse.body || 'Latest update with improvements',
+                mandatory: false
+            });
+        } catch (githubError) {
+            console.error('GitHub update check failed:', githubError.message);
+            return res.json({
+                available: false,
+                version: currentVersion,
+                currentVersion,
+                releaseNotes: githubError.message.includes('404')
+                    ? 'No published GitHub release found. Publish the release (not Draft) on GitHub.'
+                    : 'Could not reach GitHub. Set GITHUB_UPDATE_TOKEN in .env for private repo.',
+                mandatory: false,
+                error: githubError.message
+            });
         }
-        
-        res.json({
-            available: false,
-            version: currentVersion,
-            currentVersion: currentVersion,
-            releaseNotes: 'No updates available',
-            mandatory: false
-        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
