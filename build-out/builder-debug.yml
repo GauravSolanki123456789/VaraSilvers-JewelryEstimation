@@ -125,8 +125,8 @@ nsis:
 
     !addincludedir "D:\GauravSoftwares_Clients\VaraSilvers\build"
     !include "D:\GauravSoftwares_Clients\VaraSilvers\build\installer.nsh"
-    !include "C:\Users\HP\AppData\Local\Temp\t-LLnldF\2-messages.nsh"
-    !include "C:\Users\HP\AppData\Local\Temp\t-LLnldF\3-messages.nsh"
+    !include "C:\Users\HP\AppData\Local\Temp\t-G7EGuZ\2-messages.nsh"
+    !include "C:\Users\HP\AppData\Local\Temp\t-G7EGuZ\3-messages.nsh"
     !addplugindir /x86-unicode "C:\Users\HP\AppData\Local\electron-builder\Cache\nsis\nsis-resources-3.4.1-nsis-resources-3.4.1\plugins\x86-unicode"
 
     Var newStartMenuLink

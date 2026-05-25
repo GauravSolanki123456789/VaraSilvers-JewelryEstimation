@@ -17,6 +17,7 @@
     "postdist": "node scripts/copy-env-to-dist.js",
     "copy-env": "node scripts/copy-env-to-dist.js",
     "copy-env-appdata": "node scripts/copy-env-to-appdata.js",
+    "dist:publish": "electron-builder --config.directories.output=build-out --publish always",
     "setup-db": "node scripts/setup-database.js",
     "migrate": "node scripts/run-migration.js",
     "fix-gaurav-password": "node scripts/fix-gaurav-password.js",
